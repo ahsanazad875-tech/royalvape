@@ -1,0 +1,101 @@
+<abp-loader-bar></abp-loader-bar>
+
+<div
+  class="app-shell"
+  [ngClass]="{ 'is-collapsed': isSidebarCollapsed }"
+  *ngIf="currentUser$ | async as user"
+>
+  <!-- SIDEBAR -->
+  <aside class="app-sidebar">
+    <div class="brand">
+      <span class="brand-logo"><img src="../favicon.ico"></span>
+      <span class="brand-title">Royal Vapes</span>
+    </div>
+
+    <nav class="menu">
+      <div class="menu-group">
+        <div class="menu-section">Main</div>
+
+        <a
+          *ngFor="let item of primaryMenuVisible"
+          [routerLink]="item.link"
+          routerLinkActive="active"
+          [routerLinkActiveOptions]="item.exact ? { exact: true } : {}"
+          class="menu-item"
+        >
+          <i [class]="item.icon"></i>
+          <span class="menu-text">{{ item.label }}</span>
+        </a>
+      </div>
+
+      <ng-container *ngIf="adminMenuVisible.length">
+        <div class="menu-group">
+          <div class="menu-section admin-header" (click)="toggleAdminSection()">
+            <span>Administration</span>
+            <i
+              class="fa"
+              [ngClass]="isAdminOpen ? 'fa-chevron-up' : 'fa-chevron-down'"
+            ></i>
+          </div>
+
+          <div class="admin-items" *ngIf="isAdminOpen">
+            <a
+              *ngFor="let item of adminMenuVisible"
+              [routerLink]="item.link"
+              routerLinkActive="active"
+              class="menu-item"
+            >
+              <i [class]="item.icon"></i>
+              <span class="menu-text">{{ item.label }}</span>
+            </a>
+          </div>
+        </div>
+      </ng-container>
+    </nav>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="app-main">
+    <header class="app-header">
+      <div class="d-flex align-items-center gap-2">
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary sidebar-toggle me-2"
+          (click)="toggleSidebar()"
+        >
+          <i class="fa" [ngClass]="isSidebarCollapsed ? 'fa-bars' : 'fa-angle-left'"></i>
+        </button>
+
+        <div class="app-header-left">
+          <div class="app-title">{{currentTitle || 'Royal Vapes'}}</div>
+          <div class="app-subtitle">Royal Vapes – Sales & Inventory</div>
+        </div>
+      </div>
+
+      <div class="app-header-right">
+        <div class="user-pill me-2">
+          <span class="user-avatar">
+            {{ (user.userName || user.email || 'U').charAt(0).toUpperCase() }}
+          </span>
+          <span class="user-name">
+            {{ user.userName || user.email || 'User' }}
+          </span>
+        </div>
+
+        <button
+          class="btn btn-outline-secondary btn-sm"
+          type="button"
+          (click)="logout()"
+          *ngIf="user.isAuthenticated"
+        >
+          <i class="fa fa-sign-out-alt me-1"></i>
+          <span class="d-none d-sm-inline">Logout</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="app-content">
+      <router-outlet></router-outlet>
+    </main>
+  </div>
+</div>

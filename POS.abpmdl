@@ -1,0 +1,101 @@
+{
+  "template": "app",
+  "imports": {
+    "Volo.Abp.LeptonXLiteTheme": {
+      "version": "4.3.1",
+      "isInstalled": true
+    },
+    "Volo.Abp.Account": {
+      "version": "9.3.1",
+      "isInstalled": true
+    },
+    "Volo.Abp.OpenIddict": {
+      "version": "9.3.1",
+      "isInstalled": true
+    },
+    "Volo.Abp.Identity": {
+      "version": "9.3.1",
+      "isInstalled": true
+    },
+    "Volo.Abp.TenantManagement": {
+      "version": "9.3.1",
+      "isInstalled": true
+    },
+    "Volo.Abp.SettingManagement": {
+      "version": "9.3.1",
+      "isInstalled": true
+    },
+    "Volo.Abp.PermissionManagement": {
+      "version": "9.3.1",
+      "isInstalled": true
+    },
+    "Volo.Abp.FeatureManagement": {
+      "version": "9.3.1",
+      "isInstalled": true
+    }
+  },
+  "folders": {
+    "items": {
+      "src": {},
+      "test": {}
+    }
+  },
+  "packages": {
+    "POS.Application": {
+      "path": "src/POS.Application/POS.Application.abppkg",
+      "folder": "src"
+    },
+    "POS.Application.Tests": {
+      "path": "test/POS.Application.Tests/POS.Application.Tests.abppkg",
+      "folder": "test"
+    },
+    "POS.Domain.Shared": {
+      "path": "src/POS.Domain.Shared/POS.Domain.Shared.abppkg",
+      "folder": "src"
+    },
+    "POS.Application.Contracts": {
+      "path": "src/POS.Application.Contracts/POS.Application.Contracts.abppkg",
+      "folder": "src"
+    },
+    "POS.HttpApi": {
+      "path": "src/POS.HttpApi/POS.HttpApi.abppkg",
+      "folder": "src"
+    },
+    "POS.HttpApi.Client": {
+      "path": "src/POS.HttpApi.Client/POS.HttpApi.Client.abppkg",
+      "folder": "src"
+    },
+    "POS.EntityFrameworkCore.Tests": {
+      "path": "test/POS.EntityFrameworkCore.Tests/POS.EntityFrameworkCore.Tests.abppkg",
+      "folder": "test"
+    },
+    "POS.EntityFrameworkCore": {
+      "path": "src/POS.EntityFrameworkCore/POS.EntityFrameworkCore.abppkg",
+      "folder": "src"
+    },
+    "POS.TestBase": {
+      "path": "test/POS.TestBase/POS.TestBase.abppkg",
+      "folder": "test"
+    },
+    "POS.Domain.Tests": {
+      "path": "test/POS.Domain.Tests/POS.Domain.Tests.abppkg",
+      "folder": "test"
+    },
+    "POS.HttpApi.Client.ConsoleTestApp": {
+      "path": "test/POS.HttpApi.Client.ConsoleTestApp/POS.HttpApi.Client.ConsoleTestApp.abppkg",
+      "folder": "test"
+    },
+    "POS.DbMigrator": {
+      "path": "src/POS.DbMigrator/POS.DbMigrator.abppkg",
+      "folder": "src"
+    },
+    "POS.HttpApi.Host": {
+      "path": "src/POS.HttpApi.Host/POS.HttpApi.Host.abppkg",
+      "folder": "src"
+    },
+    "POS.Domain": {
+      "path": "src/POS.Domain/POS.Domain.abppkg",
+      "folder": "src"
+    }
+  }
+}

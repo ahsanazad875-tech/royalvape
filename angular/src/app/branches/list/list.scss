@@ -1,0 +1,43 @@
+.branch-card {
+  border: 0;
+  border-radius: 14px;
+}
+
+.branch-table {
+  --row-divider: rgba(0,0,0,.05);
+
+  thead th {
+    border-bottom: 1px solid var(--row-divider);
+    letter-spacing: .04em;
+  }
+
+  tbody tr {
+    border-top: 1px solid var(--row-divider);
+  }
+
+  td.code {
+    color: #555;
+    width: 14%;
+  }
+
+  td.name {
+    width: 40%;
+  }
+
+  .badge.status {
+    border-radius: 999px;
+  }
+}
+
+.btn-outline-primary {
+  border-color: #7a5cff33;
+}
+
+.table > :not(caption) > * > * {
+  padding-top: 0.9rem;
+  padding-bottom: 0.9rem;
+}
+
+.toolbar .btn {
+  border-radius: 10px;
+}

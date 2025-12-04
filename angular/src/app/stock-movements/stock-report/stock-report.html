@@ -1,0 +1,147 @@
+<div class="sm-card">
+  <div class="sm-header">
+    <div>
+      <h2 class="sm-title">Stock Report</h2>
+      <p class="sm-subtitle">Snapshot of on-hand stock by branch and product</p>
+    </div>
+
+    <span class="sm-summary" *ngIf="totalCount > 0">
+      Showing <b>{{ visibleFrom }}</b>–<b>{{ visibleTo }}</b> of
+      <b>{{ totalCount }}</b> rows
+    </span>
+  </div>
+
+  <!-- Filters -->
+  <div class="filter-card">
+    <div class="filter-card-header" (click)="filtersCollapsed = !filtersCollapsed">
+      <h3>Filters</h3>
+      <span class="toggle">{{ filtersCollapsed ? 'Show' : 'Hide' }}</span>
+    </div>
+
+    <div class="filter-card-body" *ngIf="!filtersCollapsed">
+      <form [formGroup]="form" class="filter-grid" (ngSubmit)="search()">
+        <div class="fg-item" *ngIf="isAdmin">
+          <label class="form-label" for="branchId">Branch</label>
+          <select
+            id="branchId"
+            class="form-select form-select-sm"
+            formControlName="branchId"
+          >
+            <option value="">All</option>
+            <option *ngFor="let b of branches" [value]="b.id">
+              {{ b.name }}
+            </option>
+          </select>
+        </div>
+
+        <div class="fg-item">
+          <label class="form-label" for="productId">Product</label>
+          <select
+            id="productId"
+            class="form-select form-select-sm"
+            formControlName="productId"
+          >
+            <option value="">All</option>
+            <option *ngFor="let p of products" [value]="p.id">
+              {{ p.name }}
+            </option>
+          </select>
+        </div>
+
+        <div class="fg-item fg-spacer"></div>
+
+        <!-- Actions -->
+        <div class="fg-item fg-actions">
+          <button
+            type="submit"
+            class="btn btn-primary btn-sm"
+            [disabled]="loading"
+          >
+            Search
+          </button>
+          <button
+            type="button"
+            class="btn btn-outline-secondary btn-sm"
+            (click)="reset()"
+            [disabled]="loading"
+          >
+            Reset
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- States -->
+  <div *ngIf="loading" class="sm-state sm-state-loading">Loading…</div>
+  <div *ngIf="!loading && totalCount === 0" class="sm-state sm-state-empty">
+    No stock found.
+  </div>
+
+  <!-- Table -->
+  <div class="table-wrap" *ngIf="!loading && pagedRows.length">
+    <table class="table table-sm table-sticky-header sm-table">
+      <thead>
+        <tr>
+          <th>Branch</th>
+          <th>Product</th>
+          <th>Type</th>
+          <th class="text-end">Available Quantity</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let r of pagedRows; trackBy: trackRow">
+          <td>{{ r.branchName }}</td>
+          <td>{{ r.productName }}</td>
+          <td>{{ r.productType }}</td>
+          <td class="text-end">{{ r.onHand | number: '1.0-2' }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div class="sm-footer" *ngIf="totalCount > 0">
+    <div class="sm-footer-left">
+      <label class="me-2">Rows per page</label>
+      <select
+        class="form-select form-select-sm d-inline-block w-auto"
+        [value]="pageSize"
+        (change)="onPageSizeChange($any($event.target).value)"
+      >
+        <option [value]="10">10</option>
+        <option [value]="25">25</option>
+        <option [value]="50">50</option>
+        <option [value]="100">100</option>
+      </select>
+    </div>
+
+    <div class="sm-footer-middle">
+      {{ visibleFrom }}–{{ visibleTo }} of {{ totalCount }}
+    </div>
+
+    <div class="sm-footer-right">
+      <button
+        type="button"
+        class="btn btn-sm btn-outline-secondary me-1"
+        (click)="changePage(-1)"
+        [disabled]="pageIndex === 0"
+      >
+        ‹ Prev
+      </button>
+
+      <span class="mx-2">
+        Page {{ pageIndex + 1 }}
+      </span>
+
+      <button
+        type="button"
+        class="btn btn-sm btn-outline-secondary"
+        (click)="changePage(1)"
+        [disabled]="visibleTo >= totalCount"
+      >
+        Next ›
+      </button>
+    </div>
+  </div>
+</div>

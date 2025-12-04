@@ -1,0 +1,7 @@
+.product-thumbnail {
+  width: 20px;
+  height: 20px;
+  object-fit: cover;  /* Ensures the image is cropped to fit the aspect ratio */
+  border-radius: 10%; /* Optional: Makes the image circular */
+  margin-right: 8px; /* Adds space between the image and the product name */
+}

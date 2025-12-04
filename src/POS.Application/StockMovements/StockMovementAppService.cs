@@ -1,0 +1,617 @@
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
+using POS.Permissions;
+using POS.StockMovement;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Linq.Dynamic.Core;
+using System.Threading.Tasks;
+using Volo.Abp;
+using Volo.Abp.Application.Dtos;
+using Volo.Abp.Application.Services;
+using Volo.Abp.Domain.Entities;
+using Volo.Abp.Domain.Repositories;
+using Volo.Abp.Users;
+
+namespace POS.StockMovements
+{
+    [Authorize(POSPermissions.StockMovements.Default)]
+    public class StockMovementAppService :
+        CrudAppService<StockMovementHeader, StockMovementHeaderDto, Guid,
+            PagedAndSortedResultRequestDto, CreateUpdateStockMovementHeaderDto>,
+        IStockMovementAppService
+    {
+        private readonly IRepository<StockMovementDetail, Guid> _detailRepo;
+
+        public StockMovementAppService(
+            IRepository<StockMovementHeader, Guid> headerRepo,
+            IRepository<StockMovementDetail, Guid> detailRepo)
+            : base(headerRepo)
+        {
+            _detailRepo = detailRepo;
+
+            GetPolicyName = POSPermissions.StockMovements.Default;
+            GetListPolicyName = POSPermissions.StockMovements.Default;
+            CreatePolicyName = POSPermissions.StockMovements.Create;
+            UpdatePolicyName = POSPermissions.StockMovements.Edit;
+            DeletePolicyName = POSPermissions.StockMovements.Delete;
+        }
+
+        #region Helpers
+
+        private Guid? CurrentBranchId =>
+            Guid.TryParse(CurrentUser.FindClaimValue("branch_id"), out var g) ? g : (Guid?)null;
+
+        private Task<bool> IsAdminAsync() =>
+            AuthorizationService.IsGrantedAsync(POSPermissions.StockMovements.AllBranches);
+
+        private async Task<Guid> RequireUserBranchAsync()
+        {
+            var bid = CurrentBranchId;
+            if (!bid.HasValue)
+                throw new BusinessException("NoBranchAssigned")
+                    .WithData("Message", "User does not have a branch assigned.");
+            return bid.Value;
+        }
+
+        private const decimal DefaultVatRate = 0.15m;
+
+        private static decimal ResolveVatRate(StockMovementType type) =>
+            type is StockMovementType.AdjustmentPlus or StockMovementType.AdjustmentMinus
+                ? 0m
+                : DefaultVatRate;
+
+        private static void EnsureLines(List<CreateUpdateStockMovementDetailDto>? lines)
+        {
+            if (lines == null || lines.Count == 0)
+                throw new BusinessException("NoLines");
+
+            foreach (var l in lines)
+            {
+                if (l.Quantity <= 0) throw new BusinessException("QtyMustBePositive");
+                if (l.UnitPrice is < 0) throw new BusinessException("PriceInvalid");
+                if (l.DiscountAmount is < 0) throw new BusinessException("DiscountInvalid");
+            }
+        }
+
+        private static void CalcAmounts(CreateUpdateStockMovementDetailDto d, decimal vatRate)
+        {
+            var qty = d.Quantity;
+            var unit = d.UnitPrice ?? 0m;
+            var disc = d.DiscountAmount ?? 0m;
+
+            var net = Math.Max(0m, qty * unit - disc);
+            d.AmountExclVat = decimal.Round(net, 2);
+            d.AmountVat = decimal.Round(net * vatRate, 2);
+            d.AmountInclVat = decimal.Round(net * (1 + vatRate), 2);
+        }
+
+        private static void SumHeader(CreateUpdateStockMovementHeaderDto h)
+        {
+            var details = h.Details ?? Enumerable.Empty<CreateUpdateStockMovementDetailDto>();
+            h.AmountExclVat = decimal.Round(details.Sum(x => x.AmountExclVat ?? 0m), 2);
+            h.AmountVat = decimal.Round(details.Sum(x => x.AmountVat ?? 0m), 2);
+            h.AmountInclVat = decimal.Round(details.Sum(x => x.AmountInclVat ?? 0m), 2);
+        }
+
+        private async Task EnforceBranchRulesAsync(CreateUpdateStockMovementHeaderDto input)
+        {
+            var isAdmin = await IsAdminAsync();
+
+            if (isAdmin)
+            {
+                // Admin must explicitly target a branch
+                if (input.BranchId == Guid.Empty)
+                    throw new BusinessException("BranchRequiredForAdmin");
+
+                // Admin can Purchase or Sale (no adjustments by design)
+                if (input.StockMovementType == StockMovementType.AdjustmentPlus ||
+                    input.StockMovementType == StockMovementType.AdjustmentMinus)
+                    throw new UserFriendlyException("Admins cannot adjust stock; only Purchase or Sale.");
+            }
+            else
+            {
+                // Non-admins are forced to their branch always
+                input.BranchId = await RequireUserBranchAsync();
+            }
+        }
+
+        #endregion
+
+        #region CRUD
+
+        public override async Task<StockMovementHeaderDto> CreateAsync(CreateUpdateStockMovementHeaderDto input)
+        {
+            await CheckCreatePolicyAsync();
+            await EnforceBranchRulesAsync(input);
+
+            EnsureLines(input.Details);
+
+            var vatRate = ResolveVatRate(input.StockMovementType);
+            foreach (var d in input.Details!)
+                CalcAmounts(d, vatRate);
+
+            SumHeader(input);
+
+            var header = ObjectMapper.Map<CreateUpdateStockMovementHeaderDto, StockMovementHeader>(input);
+
+            if (string.IsNullOrWhiteSpace(header.StockMovementNo))
+            {
+                var count = await Repository.GetCountAsync();
+                header.StockMovementNo = $"GM-{count + 1}";
+            }
+
+            header.IsCancelled = false;
+
+            header = await Repository.InsertAsync(header, autoSave: true);
+
+            foreach (var d in input.Details!)
+            {
+                var detail = ObjectMapper.Map<CreateUpdateStockMovementDetailDto, StockMovementDetail>(d);
+                detail.StockMovementHeaderId = header.Id;
+                await _detailRepo.InsertAsync(detail, autoSave: true);
+            }
+
+            return ObjectMapper.Map<StockMovementHeader, StockMovementHeaderDto>(header);
+        }
+
+        public override async Task<StockMovementHeaderDto> GetAsync(Guid id)
+        {
+            var q = (await Repository.GetQueryableAsync())
+                .Include(h => h.Branch)
+                .Include(h => h.StockMovementDetails)
+                    .ThenInclude(d => d.Product);
+
+            var entity = await AsyncExecuter.FirstOrDefaultAsync(q.Where(x => x.Id == id));
+            if (entity == null)
+                throw new EntityNotFoundException(typeof(StockMovementHeader), id);
+
+            if (!await IsAdminAsync())
+            {
+                var bid = await RequireUserBranchAsync();
+                if (entity.BranchId != bid)
+                    throw new UserFriendlyException("You are not allowed to access this record.");
+            }
+
+            return ObjectMapper.Map<StockMovementHeader, StockMovementHeaderDto>(entity);
+        }
+
+        protected override async Task<IQueryable<StockMovementHeader>> CreateFilteredQueryAsync(PagedAndSortedResultRequestDto input)
+        {
+            var q = await Repository.GetQueryableAsync();
+            if (!await IsAdminAsync())
+            {
+                var bid = await RequireUserBranchAsync();
+                q = q.Where(x => x.BranchId == bid);
+            }
+            return q;
+        }
+
+        public override async Task<StockMovementHeaderDto> UpdateAsync(Guid id, CreateUpdateStockMovementHeaderDto input)
+        {
+            var existing = await GetEntityByIdAsync(id);
+            if (existing.IsCancelled)
+                throw new UserFriendlyException("Cancelled movements cannot be updated.");
+
+            await EnforceBranchRulesAsync(input);
+
+            EnsureLines(input.Details);
+
+            var vatRate = ResolveVatRate(input.StockMovementType);
+            foreach (var d in input.Details!)
+                CalcAmounts(d, vatRate);
+
+            SumHeader(input);
+
+            return await base.UpdateAsync(id, input);
+        }
+
+        #endregion
+
+        #region Actions
+
+        [Authorize(POSPermissions.StockMovements.Edit)]
+        public virtual async Task CancelAsync(Guid id, string? reason = null)
+        {
+            var entity = await GetEntityByIdAsync(id);
+            if (entity.IsCancelled) return;
+
+            entity.IsCancelled = true;
+            if (!string.IsNullOrWhiteSpace(reason))
+            {
+                entity.Description = string.IsNullOrWhiteSpace(entity.Description)
+                    ? $"[CANCELLED] {reason}"
+                    : $"{entity.Description} | [CANCELLED] {reason}";
+            }
+
+            await Repository.UpdateAsync(entity, autoSave: true);
+        }
+
+        [Authorize(POSPermissions.StockMovements.Create)]
+        public virtual Task<StockMovementHeaderDto> AddStockAsync(CreateUpdateStockMovementHeaderDto dto)
+        {
+            dto.StockMovementType = StockMovementType.Purchase;
+            return CreateAsync(dto);
+        }
+
+        // Admins can sell too, but must specify BranchId (EnforceBranchRules handles it)
+        [Authorize(POSPermissions.StockMovements.Create)]
+        public virtual async Task<StockMovementHeaderDto> CheckoutCartAsync(CreateUpdateStockMovementHeaderDto dto)
+        {
+            dto.StockMovementType = StockMovementType.Sale;
+            return await CreateAsync(dto);
+        }
+
+        // Non-admin only by design (EnforceBranchRules will block admin adjustments)
+        [Authorize(POSPermissions.StockMovements.Create)]
+        public virtual async Task<StockMovementHeaderDto> AdjustStockAsync(CreateUpdateStockMovementHeaderDto dto)
+        {
+            if (dto.StockMovementType != StockMovementType.AdjustmentPlus &&
+                dto.StockMovementType != StockMovementType.AdjustmentMinus)
+                throw new UserFriendlyException("Invalid adjustment type.");
+
+            return await CreateAsync(dto);
+        }
+
+        #endregion
+
+        #region Reports & On-hand
+
+        [Authorize(POSPermissions.StockMovements.Default)]
+        public virtual async Task<PagedResultDto<ProductMovementDto>> GetProductMovementsAsync(ProductMovementFlatRequestDto input)
+        {
+            var isAdmin = await IsAdminAsync();
+            var effectiveBranchId = isAdmin ? input.BranchId : await RequireUserBranchAsync();
+
+            var q = (await Repository.GetQueryableAsync());
+
+            if (!input.IncludeCancelled)
+                q = q.Where(h => !h.IsCancelled);
+
+            if (effectiveBranchId.HasValue && effectiveBranchId.Value != Guid.Empty)
+                q = q.Where(h => h.BranchId == effectiveBranchId.Value);
+
+            if (input.DateFrom.HasValue)
+                q = q.Where(h => h.CreationTime >= input.DateFrom.Value);
+
+            if (input.DateTo.HasValue)
+                q = q.Where(h => h.CreationTime <= input.DateTo.Value);
+
+            if (input.ProductId.HasValue && input.ProductId.Value != Guid.Empty)
+                q = q.Where(h => h.StockMovementDetails.Any(d => d.ProductId == input.ProductId.Value));
+
+            if (input.ProductTypeId.HasValue && input.ProductTypeId.Value != Guid.Empty)
+                q = q.Where(h => h.StockMovementDetails.Any(d => d.Product.ProductTypeId == input.ProductTypeId.Value));
+
+            if (input.StockMovementType.HasValue)
+                q = q.Where(h => h.StockMovementType == input.StockMovementType.Value);
+
+            q.Include(x => x.Creator);
+
+            var flat = from h in q
+                       from d in h.StockMovementDetails
+                       select new ProductMovementDto
+                       {
+                           Id = d.Id,
+                           HeaderId = h.Id,
+                           StockMovementNo = h.StockMovementNo,
+                           MovementDate = h.CreationTime,
+                           CreatedByUserId = h.CreatorId,
+                           CreatedBy = h.Creator == null ? "" : h.Creator.Name,
+                           BranchId = h.BranchId,
+                           BranchName = h.Branch.Name,
+                           StockMovementType = h.StockMovementType,
+                           ProductId = d.ProductId,
+                           ProductName = d.Product.ProductName,
+                           ProductType = d.Product.ProductType.Type,
+                           QuantitySigned =
+                               (h.StockMovementType == StockMovementType.Purchase ||
+                                h.StockMovementType == StockMovementType.AdjustmentPlus)
+                                   ? d.Quantity
+                                   : -d.Quantity,
+                           UnitPrice = d.UnitPrice,
+                           AmountExclVat = d.AmountExclVat,
+                           AmountVat = d.AmountVat,
+                           AmountInclVat = d.AmountInclVat,
+                           Description = h.Description
+                       };
+
+            var sorting = string.IsNullOrWhiteSpace(input.Sorting)
+                ? "MovementDate DESC, StockMovementNo DESC"
+                : input.Sorting;
+
+            var sorted = flat.OrderBy(sorting);
+
+            var totalCount = await AsyncExecuter.CountAsync(sorted);
+            var items = await AsyncExecuter.ToListAsync(
+                sorted.Skip(input.SkipCount).Take(input.MaxResultCount > 0 ? input.MaxResultCount : 50)
+            );
+
+            return new PagedResultDto<ProductMovementDto>(totalCount, items);
+        }
+
+        [Authorize(POSPermissions.StockMovements.Default)]
+        public virtual async Task<List<StockReportDto>> GetStockReportAsync(Guid? branchId = null, Guid? productId = null)
+        {
+            var isAdmin = await IsAdminAsync();
+            if (!isAdmin)
+                branchId = await RequireUserBranchAsync();
+
+            var baseQuery = (await Repository.GetQueryableAsync())
+                .Where(h => !h.IsCancelled);
+
+            if (branchId.HasValue && branchId.Value != Guid.Empty)
+                baseQuery = baseQuery.Where(h => h.BranchId == branchId.Value);
+
+            if (productId.HasValue && productId.Value != Guid.Empty)
+                baseQuery = baseQuery.Where(h => h.StockMovementDetails.Any(d => d.ProductId == productId.Value));
+
+            var q = from h in baseQuery
+                    from d in h.StockMovementDetails
+                    select new
+                    {
+                        h.BranchId,
+                        BranchName = h.Branch.Name,
+                        d.ProductId,
+                        ProductName = d.Product.ProductNo + " " + d.Product.ProductName,
+                        ProductTypeId = d.Product.ProductTypeId,
+                        ProductType = d.Product.ProductType.TypeDesc,
+                        SignedQty =
+                            (h.StockMovementType == StockMovementType.Purchase ||
+                             h.StockMovementType == StockMovementType.AdjustmentPlus)
+                                ? d.Quantity
+                                : -d.Quantity
+                    };
+
+            var grouped = await AsyncExecuter.ToListAsync(
+                q.GroupBy(x => new { x.BranchId, x.BranchName, x.ProductId, x.ProductName })
+                 .Select(g => new StockReportDto
+                 {
+                     BranchId = g.Key.BranchId,
+                     BranchName = g.Key.BranchName,
+                     ProductId = g.Key.ProductId,
+                     ProductName = g.Key.ProductName,
+                     ProductTypeId = g.First().ProductTypeId,
+                     ProductType = g.First().ProductType ?? "",
+                     OnHand = g.Sum(x => x.SignedQty)
+                 })
+            );
+
+            return grouped.OrderBy(x => x.BranchName).ThenBy(x => x.ProductName).ToList();
+        }
+
+        [Authorize(POSPermissions.StockMovements.Default)]
+        public virtual async Task<Dictionary<Guid, decimal>> GetOnHandMapAsync(List<Guid> productIds, Guid? branchId = null)
+        {
+            var list = await GetOnHandListAsync(productIds, branchId);
+            return list.ToDictionary(x => x.ProductId, x => x.OnHand);
+        }
+
+        [Authorize(POSPermissions.StockMovements.Default)]
+        public virtual async Task<List<OnHandItemDto>> GetOnHandListAsync(List<Guid> productIds, Guid? branchId = null)
+        {
+            if (productIds == null || productIds.Count == 0)
+                return new List<OnHandItemDto>();
+
+            var isAdmin = await IsAdminAsync();
+            var effectiveBranchId = isAdmin ? branchId : await RequireUserBranchAsync();
+
+            var baseQuery = (await Repository.GetQueryableAsync())
+                .Where(h => !h.IsCancelled);
+
+            if (effectiveBranchId.HasValue && effectiveBranchId.Value != Guid.Empty)
+                baseQuery = baseQuery.Where(h => h.BranchId == effectiveBranchId.Value);
+
+            var q = from h in baseQuery
+                    from d in h.StockMovementDetails
+                    where productIds.Contains(d.ProductId)
+                    select new
+                    {
+                        d.ProductId,
+                        SignedQty =
+                            (h.StockMovementType == StockMovementType.Purchase ||
+                             h.StockMovementType == StockMovementType.AdjustmentPlus)
+                                ? d.Quantity
+                                : -d.Quantity
+                    };
+
+            var grouped = await AsyncExecuter.ToListAsync(
+                q.GroupBy(x => x.ProductId)
+                 .Select(g => new OnHandItemDto
+                 {
+                     ProductId = g.Key,
+                     OnHand = g.Sum(x => x.SignedQty)
+                 })
+            );
+
+            // Ensure zeros for any requested product with no movements
+            var requested = productIds.ToHashSet();
+            foreach (var pid in requested)
+                if (!grouped.Any(x => x.ProductId == pid))
+                    grouped.Add(new OnHandItemDto { ProductId = pid, OnHand = 0 });
+
+            return grouped;
+        }
+
+        #endregion
+
+        #region Dashboard
+
+        private const decimal LowStockThreshold = 5m; // you can tweak this
+
+        [Authorize(POSPermissions.StockMovements.Default)]
+        public virtual async Task<StockDashboardSummaryDto> GetDashboardSummaryAsync(Guid? branchId = null)
+        {
+            var isAdmin = await IsAdminAsync();
+            var effectiveBranchId = isAdmin ? branchId : await RequireUserBranchAsync();
+
+            var qHeaders = (await Repository.GetQueryableAsync())
+                .Where(h => !h.IsCancelled);
+
+            if (effectiveBranchId.HasValue && effectiveBranchId.Value != Guid.Empty)
+                qHeaders = qHeaders.Where(h => h.BranchId == effectiveBranchId.Value);
+
+            // ----- Today's sales (header.AmountInclVat, only Sales) -----
+            var today = Clock.Now.Date;
+            var tomorrow = today.AddDays(1);
+
+            var todaySalesQuery = qHeaders
+                .Where(h => h.StockMovementType == StockMovementType.Sale &&
+                            h.CreationTime >= today &&
+                            h.CreationTime < tomorrow)
+                .Select(h => h.AmountInclVat ?? 0m);
+
+            var todaySalesList = await AsyncExecuter.ToListAsync(todaySalesQuery);
+            var todaySales = todaySalesList.Sum();
+
+            // ----- Stock value, active products, low stock -----
+            // Calculate on-hand and simple weighted-average cost per product.
+            var stockAggQuery =
+                from h in qHeaders
+                from d in h.StockMovementDetails
+                group new { h, d } by d.ProductId
+                into g
+                select new
+                {
+                    ProductId = g.Key,
+                    OnHand = g.Sum(x =>
+                        (x.h.StockMovementType == StockMovementType.Purchase ||
+                         x.h.StockMovementType == StockMovementType.AdjustmentPlus)
+                            ? x.d.Quantity
+                            : -x.d.Quantity),
+                    TotalInQty = g.Sum(x =>
+                        (x.h.StockMovementType == StockMovementType.Purchase ||
+                         x.h.StockMovementType == StockMovementType.AdjustmentPlus)
+                            ? x.d.Quantity
+                            : 0m),
+                    TotalInCost = g.Sum(x =>
+                        (x.h.StockMovementType == StockMovementType.Purchase ||
+                         x.h.StockMovementType == StockMovementType.AdjustmentPlus)
+                            ? x.d.Quantity * (x.d.UnitPrice ?? 0m)
+                            : 0m)
+                };
+
+            var stockAggList = await AsyncExecuter.ToListAsync(stockAggQuery);
+
+            decimal stockValue = 0m;
+            var activeProducts = 0;
+            var lowStockItems = 0;
+
+            foreach (var x in stockAggList)
+            {
+                if (x.OnHand > 0)
+                {
+                    activeProducts++;
+
+                    if (x.OnHand <= LowStockThreshold)
+                        lowStockItems++;
+
+                    if (x.TotalInQty > 0)
+                    {
+                        var avgCost = x.TotalInCost / x.TotalInQty;
+                        stockValue += x.OnHand * avgCost;
+                    }
+                }
+            }
+
+            return new StockDashboardSummaryDto
+            {
+                TodaySales = decimal.Round(todaySales, 0),
+                StockValue = decimal.Round(stockValue, 0),
+                ActiveProducts = activeProducts,
+                LowStockItems = lowStockItems
+            };
+        }
+
+        [Authorize(POSPermissions.StockMovements.Default)]
+        public virtual async Task<List<DailySalesPointDto>> GetLast7DaysSalesAsync(Guid? branchId = null)
+        {
+            var isAdmin = await IsAdminAsync();
+            var effectiveBranchId = isAdmin ? branchId : await RequireUserBranchAsync();
+
+            var qHeaders = (await Repository.GetQueryableAsync())
+                .Where(h => !h.IsCancelled &&
+                            h.StockMovementType == StockMovementType.Sale);
+
+            if (effectiveBranchId.HasValue && effectiveBranchId.Value != Guid.Empty)
+                qHeaders = qHeaders.Where(h => h.BranchId == effectiveBranchId.Value);
+
+            var today = Clock.Now.Date;
+            var fromDate = today.AddDays(-6);
+
+            var groupedQuery =
+                qHeaders
+                    .Where(h => h.CreationTime >= fromDate &&
+                                h.CreationTime < today.AddDays(1))
+                    .GroupBy(h => h.CreationTime.Date)
+                    .Select(g => new DailySalesPointDto
+                    {
+                        Date = g.Key,
+                        Amount = g.Sum(x => x.AmountInclVat ?? 0m)
+                    });
+
+            var grouped = await AsyncExecuter.ToListAsync(groupedQuery);
+            var map = grouped.ToDictionary(x => x.Date.Date, x => x.Amount);
+
+            // Ensure all 7 days exist
+            var result = new List<DailySalesPointDto>();
+            for (var i = 0; i < 7; i++)
+            {
+                var d = fromDate.AddDays(i);
+                map.TryGetValue(d, out var amount);
+                result.Add(new DailySalesPointDto
+                {
+                    Date = d,
+                    Amount = amount
+                });
+            }
+
+            return result.OrderBy(x => x.Date).ToList();
+        }
+
+        [Authorize(POSPermissions.StockMovements.Default)]
+        public virtual async Task<List<StockByProductTypeDto>> GetStockByProductTypeAsync(Guid? branchId = null)
+        {
+            var isAdmin = await IsAdminAsync();
+            var effectiveBranchId = isAdmin ? branchId : await RequireUserBranchAsync();
+
+            var qHeaders = (await Repository.GetQueryableAsync())
+                .Where(h => !h.IsCancelled);
+
+            if (effectiveBranchId.HasValue && effectiveBranchId.Value != Guid.Empty)
+                qHeaders = qHeaders.Where(h => h.BranchId == effectiveBranchId.Value);
+
+            var query =
+                from h in qHeaders
+                from d in h.StockMovementDetails
+                group new { h, d } by new
+                {
+                    d.Product.ProductTypeId,
+                    TypeDesc = d.Product.ProductType.TypeDesc
+                }
+                into g
+                select new StockByProductTypeDto
+                {
+                    ProductTypeId = g.Key.ProductTypeId,
+                    ProductType = g.Key.TypeDesc ?? string.Empty,
+                    OnHand = g.Sum(x =>
+                        (x.h.StockMovementType == StockMovementType.Purchase ||
+                         x.h.StockMovementType == StockMovementType.AdjustmentPlus)
+                            ? x.d.Quantity
+                            : -x.d.Quantity)
+                };
+
+            var list = await AsyncExecuter.ToListAsync(query);
+
+            // Only keep positive on-hand, sorted by qty desc (front-end can still filter)
+            return list
+                .Where(x => x.OnHand > 0)
+                .OrderByDescending(x => x.OnHand)
+                .ToList();
+        }
+
+        #endregion
+
+    }
+}

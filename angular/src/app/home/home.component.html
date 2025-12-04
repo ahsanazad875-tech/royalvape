@@ -1,0 +1,140 @@
+<div class="dashboard-page">
+  <!-- HEADER / CONTEXT -->
+  <div class="row gy-3 mb-3">
+    <div class="col-12 d-flex justify-content-between align-items-start flex-wrap gap-3">
+      <div>
+        <h2 class="page-title mb-1">Dashboard</h2>
+
+        <p class="text-muted mb-0" *ngIf="hasLoggedIn && isAdmin">
+          Overview of sales & inventory across branches.
+        </p>
+
+        <p class="text-muted mb-0" *ngIf="!hasLoggedIn">
+          Sign in to see real-time sales and inventory for your branch.
+        </p>
+      </div>
+
+      <div class="d-flex align-items-end flex-wrap gap-3">
+        <!-- Branch filter: ADMIN ONLY -->
+        <div class="dashboard-branch-filter" *ngIf="hasLoggedIn && isAdmin">
+          <label class="form-label mb-1">Branch</label>
+          <select
+            class="form-select form-select-sm"
+            [(ngModel)]="selectedBranchId"
+            (change)="onBranchChanged()"
+          >
+            <option value="">All branches</option>
+            <option *ngFor="let b of branches" [value]="b.id">
+              {{ b.name }}
+            </option>
+          </select>
+        </div>
+
+        <button
+          *ngIf="hasLoggedIn"
+          type="button"
+          class="btn btn-outline-primary btn-sm"
+          (click)="refresh()"
+        >
+          <i class="fa fa-sync-alt me-1"></i>
+          Refresh
+        </button>
+
+        <button
+          *ngIf="!hasLoggedIn"
+          type="button"
+          class="btn btn-primary btn-sm"
+          (click)="login()"
+        >
+          <i class="fa fa-sign-in-alt me-1"></i>
+          Login
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GUEST INFO -->
+  <ng-container *ngIf="!hasLoggedIn">
+    <div class="card mt-2">
+      <div
+        class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3"
+      >
+        <div>
+          <h5 class="mb-1">Welcome to Royal Vapes POS</h5>
+          <p class="text-muted mb-0">
+            Log in to see dashboard KPIs, sales charts and branch inventory.
+          </p>
+        </div>
+
+        <button type="button" class="btn btn-primary" (click)="login()">
+          <i class="fa fa-sign-in-alt me-1"></i>
+          Login
+        </button>
+      </div>
+    </div>
+  </ng-container>
+
+  <!-- AUTHENTICATED DASHBOARD -->
+  <ng-container *ngIf="hasLoggedIn">
+    <!-- SUMMARY CARDS -->
+    <div class="row gy-3 mb-3">
+      <div class="col-md-3 col-sm-6" *ngFor="let card of summaryCards">
+        <div class="card dashboard-stat-card h-100">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-1">
+              <span class="stat-label">{{ card.label }}</span>
+              <span class="stat-icon">
+                <i [class]="card.icon"></i>
+              </span>
+            </div>
+            <div class="stat-value">
+              {{ card.value | number: card.format }}
+            </div>
+            <div class="stat-subtitle" *ngIf="card.subtitle">
+              {{ card.subtitle }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CHARTS ROW -->
+    <div class="row gy-3 mb-3">
+      <!-- Sales chart -->
+      <div class="col-lg-7">
+        <div class="card h-100">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Sales – last 7 days</span>
+          </div>
+          <div class="card-body dashboard-chart">
+            <canvas
+              baseChart
+              [type]="'bar'"
+              [data]="salesChartData"
+              [options]="salesChartOptions"
+            >
+            </canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stock breakdown chart -->
+      <div class="col-lg-5">
+        <div class="card h-100">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Stock by product type</span>
+          </div>
+          <div class="card-body dashboard-chart">
+            <canvas
+              baseChart
+              [type]="'doughnut'"
+              [data]="stockChartData"
+              [options]="stockChartOptions"
+            >
+            </canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </ng-container>
+</div>

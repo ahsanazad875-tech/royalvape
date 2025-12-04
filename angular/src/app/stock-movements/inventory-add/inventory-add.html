@@ -1,0 +1,314 @@
+<div class="stock-purchase">
+  <div class="stock-purchase-container">
+    <!-- HEADER -->
+    <div class="stock-header">
+      <div class="header-content">
+        <h1 class="header-title">Add Stock (Purchase)</h1>
+        <p class="header-subtitle">Record incoming inventory from suppliers</p>
+      </div>
+
+      <div class="header-actions">
+        <button type="button" class="btn btn-outline-secondary" (click)="cancel()">
+          <i class="fa fa-arrow-left me-1"></i>
+          Back to stock
+        </button>
+      </div>
+    </div>
+
+    <!-- LOADING -->
+    <div
+      class="stock-purchase-loading mb-3"
+      *ngIf="!products.length && !vm.details?.length"
+    >
+      <div class="spinner-border" role="status"></div>
+    </div>
+
+    <!-- FORM -->
+    <form (ngSubmit)="save()" novalidate>
+      <!-- BASIC INFO + SUMMARY -->
+      <div class="info-card">
+        <div class="info-card-header">
+          <i class="fa fa-info-circle"></i>
+          <span>Basic information</span>
+        </div>
+
+        <div class="info-card-body">
+          <div class="row g-4 align-items-start">
+            <!-- LEFT: form fields -->
+            <div class="col-lg-8">
+              <div class="row g-3">
+                <!-- Branch -->
+                <div class="col-md-6">
+                  <label class="form-label">Branch</label>
+
+                  <!-- Admin: can change branch -->
+                  <ng-container *ngIf="isAdmin; else branchReadonly">
+                    <select
+                      class="form-select"
+                      [(ngModel)]="vm.branchId"
+                      name="branchId"
+                      (ngModelChange)="onBranchChanged()"
+                      required
+                    >
+                      <option [ngValue]="null" disabled>Select branch</option>
+                      <option *ngFor="let b of branches" [ngValue]="b.id">
+                        {{ b.name }}
+                      </option>
+                    </select>
+                  </ng-container>
+
+                  <!-- Non-admin: backend infers branch -->
+                  <ng-template #branchReadonly>
+                    <div class="readonly-field">
+                      Current branch
+                    </div>
+                    <small class="text-muted">
+                      Stock will be added to your assigned branch.
+                    </small>
+                  </ng-template>
+                </div>
+
+                <!-- Supplier -->
+                <div class="col-md-6">
+                  <label class="form-label">Supplier</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    placeholder="Supplier / vendor name"
+                    [(ngModel)]="vm.businessPartnerName"
+                    name="supplier"
+                  />
+                </div>
+
+                <!-- Description -->
+                <div class="col-12">
+                  <label class="form-label">Description / Notes</label>
+                  <textarea
+                    class="form-control"
+                    rows="2"
+                    placeholder="Short note about this stock purchase"
+                    [(ngModel)]="vm.description"
+                    name="description"
+                  ></textarea>
+                </div>
+              </div>
+            </div>
+
+            <!-- RIGHT: summary -->
+            <div class="col-lg-4">
+              <div class="summary-panel">
+                <div class="summary-panel-header">
+                  <span>Purchase summary</span>
+                  <small class="text-muted">
+                    VAT {{ (vatRate * 100) | number: '1.0-0' }}%
+                  </small>
+                </div>
+
+                <div class="summary-panel-body">
+                  <div class="summary-row">
+                    <span>Lines</span>
+                    <strong>{{ vm.details?.length || 0 }}</strong>
+                  </div>
+
+                  <div class="summary-row">
+                    <span>Subtotal (Excl VAT)</span>
+                    <strong>
+                      {{ currencySymbol }} {{ vm.amountExclVat | number: '1.2-2' }}
+                    </strong>
+                  </div>
+
+                  <div class="summary-row">
+                    <span>VAT</span>
+                    <strong>
+                      {{ currencySymbol }} {{ vm.amountVat | number: '1.2-2' }}
+                    </strong>
+                  </div>
+
+                  <div class="summary-total">
+                    <span>Total (Incl VAT)</span>
+                    <strong>
+                      {{ currencySymbol }} {{ vm.amountInclVat | number: '1.2-2' }}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LINES TABLE -->
+      <div class="lines-card">
+        <div class="lines-card-header">
+          <div class="lines-title">
+            <i class="fa fa-layer-group"></i>
+            <span>Lines</span>
+            <span
+              class="badge bg-primary-soft text-primary-dark"
+              *ngIf="vm.details?.length"
+            >
+              {{ vm.details.length }} item{{ vm.details.length > 1 ? 's' : '' }}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            (click)="addLine()"
+          >
+            <i class="fa fa-plus me-1"></i>
+            Add line
+          </button>
+        </div>
+
+        <div class="lines-card-body">
+          <div class="table-responsive">
+            <table
+              class="table table-sm align-middle lines-table"
+              *ngIf="vm.details?.length; else noLines"
+            >
+              <thead>
+                <tr>
+                  <th style="width: 26%">Product</th>
+                  <th style="width: 10%">UOM</th>
+                  <th style="width: 8%" class="text-end">Qty</th>
+                  <th style="width: 12%" class="text-end">
+                    Unit price ({{ currencySymbol }})
+                  </th>
+                  <th style="width: 12%" class="text-end">
+                    Discount ({{ currencySymbol }})
+                  </th>
+                  <th style="width: 12%" class="text-end">
+                    Excl VAT ({{ currencySymbol }})
+                  </th>
+                  <th style="width: 12%" class="text-end">
+                    Incl VAT ({{ currencySymbol }})
+                  </th>
+                  <th style="width: 8%"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let row of vm.details; let i = index">
+                  <!-- Product -->
+                  <td>
+                    <select
+                      class="form-select form-select-sm"
+                      [(ngModel)]="row.productId"
+                      name="product-{{ i }}"
+                      (ngModelChange)="onProductChange(i)"
+                      required
+                    >
+                      <option [ngValue]="null" disabled>Select product</option>
+                      <option *ngFor="let p of products" [ngValue]="p.id">
+                        {{ p.productName }}
+                      </option>
+                    </select>
+                  </td>
+
+                  <!-- UOM -->
+                  <td>
+                    <span class="uom-pill">{{ uomLabel(row.uoM) }}</span>
+                  </td>
+
+                  <!-- Qty -->
+                  <td>
+                    <input
+                      type="number"
+                      min="1"
+                      class="form-control form-control-sm text-end"
+                      [(ngModel)]="row.quantity"
+                      name="qty-{{ i }}"
+                      (ngModelChange)="onRowChange(i)"
+                    />
+                  </td>
+
+                  <!-- Unit price -->
+                  <td>
+                    <input
+                      type="number"
+                      min="0"
+                      class="form-control form-control-sm text-end"
+                      [(ngModel)]="row.unitPrice"
+                      name="unitPrice-{{ i }}"
+                      (ngModelChange)="onRowChange(i)"
+                    />
+                  </td>
+
+                  <!-- Discount -->
+                  <td>
+                    <div class="input-group input-group-sm">
+                      <span class="input-group-text">-</span>
+                      <input
+                        type="number"
+                        min="0"
+                        class="form-control text-end"
+                        [(ngModel)]="row.discountAmount"
+                        name="disc-{{ i }}"
+                        (ngModelChange)="onRowChange(i)"
+                      />
+                    </div>
+                  </td>
+
+                  <!-- Excl VAT -->
+                  <td class="text-end text-nowrap">
+                    {{ currencySymbol }} {{ row.amountExclVat | number: '1.2-2' }}
+                  </td>
+
+                  <!-- Incl VAT -->
+                  <td class="text-end text-nowrap fw-semibold text-primary-dark">
+                    {{ currencySymbol }} {{ row.amountInclVat | number: '1.2-2' }}
+                  </td>
+
+                  <!-- Remove -->
+                  <td class="text-center">
+                    <button
+                      type="button"
+                      class="btn btn-link btn-sm text-danger"
+                      (click)="removeLine(i)"
+                    >
+                      <i class="fa fa-xmark"></i>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <ng-template #noLines>
+              <div class="text-center text-muted py-4">
+                No lines added yet.
+                <button
+                  type="button"
+                  class="btn btn-outline-primary btn-sm ms-2"
+                  (click)="addLine()"
+                >
+                  <i class="fa fa-plus me-1"></i>
+                  Add first line
+                </button>
+              </div>
+            </ng-template>
+          </div>
+        </div>
+      </div>
+
+      <!-- ACTIONS -->
+      <div class="form-actions">
+        <button
+          type="button"
+          class="btn btn-outline-secondary"
+          (click)="cancel()"
+        >
+          Cancel
+        </button>
+
+        <button
+          type="submit"
+          class="btn btn-primary"
+          [disabled]="!vm.details?.length || (isAdmin && !vm.branchId)"
+        >
+          <i class="fa fa-floppy-disk me-1"></i>
+          Save
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

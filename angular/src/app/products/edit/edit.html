@@ -1,0 +1,133 @@
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form (ngSubmit)="save()" novalidate>
+
+      <div class="row g-4">
+        <!-- Left: Fields -->
+        <div class="col-12 col-lg-7">
+          <div class="d-flex align-items-center mb-2">
+            <h5 class="mb-0">Product</h5>
+            <span class="ms-2 badge bg-light text-muted">Create / Edit</span>
+          </div>
+          <hr class="mt-2 mb-4" />
+
+          <!-- Product No (edit only) -->
+          <div class="mb-3" *ngIf="id">
+            <label class="form-label small text-muted">Product No</label>
+            <input class="form-control" [(ngModel)]="vm.productNo" name="productNo" readonly />
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Name <span class="text-danger">*</span></label>
+            <input class="form-control" [(ngModel)]="vm.productName" name="name" required maxlength="150" placeholder="e.g., Blueberry 30ml" />
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Type <span class="text-danger">*</span></label>
+            <select class="form-select" [(ngModel)]="vm.productTypeId" name="type" required>
+              <option [ngValue]="null" disabled>-- Select Type --</option>
+              <option *ngFor="let t of types" [value]="t.id">{{ t.type }}</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Unit of Measure <span class="text-danger">*</span></label>
+            <select class="form-select" [(ngModel)]="vm.uoM" name="uom" required>
+              <option [ngValue]="null" disabled>-- Select UoM --</option>
+              <option *ngFor="let o of uomOptions" [ngValue]="o.value">{{ o.label }}</option>
+            </select>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-12 col-md-6">
+              <label class="form-label">Buying</label>
+              <input type="number" step="0.01" class="form-control" [(ngModel)]="vm.buyingUnitPrice" name="buy" placeholder="0.00" />
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label">Selling</label>
+              <input type="number" step="0.01" class="form-control" [(ngModel)]="vm.sellingUnitPrice" name="sell" placeholder="0.00" />
+            </div>
+          </div>
+
+          <div class="mb-3 mt-3">
+            <label class="form-label">Description</label>
+            <textarea class="form-control" rows="3" [(ngModel)]="vm.productDesc" name="desc" placeholder="Notes, flavor, size, etc."></textarea>
+          </div>
+        </div>
+
+        <!-- Right: Image -->
+        <div class="col-12 col-lg-5">
+          <div class="d-flex align-items-center mb-2">
+            <h6 class="mb-0">Product Image</h6>
+            <span class="ms-2 text-muted small">1 image only</span>
+          </div>
+
+          <div class="p-3 border rounded-3 bg-light-subtle">
+            <div class="ratio ratio-1x1 rounded-3 overflow-hidden border bg-white">
+              <!-- New selection takes precedence -->
+              <img
+                *ngIf="previewUrl; else showExistingOrEmpty"
+                [src]="previewUrl"
+                class="w-100 h-100 object-fit-contain"
+                alt="Preview" />
+            </div>
+
+            <ng-template #showExistingOrEmpty>
+              <img
+                *ngIf="existingImageUrl; else emptyBox"
+                [src]="existingImageUrl"
+                class="w-100 h-100 object-fit-contain"
+                alt="Current" />
+              <ng-template #emptyBox>
+                <div class="d-flex align-items-center justify-content-center h-100 text-muted">
+                  No image selected
+                </div>
+              </ng-template>
+            </ng-template>
+
+            <div class="d-flex flex-wrap gap-2 mt-3">
+              <label class="btn btn-outline-primary mb-0">
+                <input type="file" accept="image/*" (change)="onFileSelected($event)" hidden>
+                Choose Image
+              </label>
+
+              <!-- <button
+                type="button"
+                class="btn btn-outline-secondary"
+                (click)="removeImage()"
+                [disabled]="!previewUrl && !pendingFile">
+                Remove
+              </button> -->
+
+              <button
+                *ngIf="id && (existingImageUrl || previewUrl)"
+                type="button"
+                class="btn btn-outline-danger"
+                (click)="deleteImage()"
+                [disabled]="saving">
+                Delete Image
+              </button>
+            </div>
+
+            <div class="small text-muted mt-2">
+              Recommended: square image, ≤ 2MB. JPG/PNG/WebP.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-end mt-4">
+        <button class="btn btn-primary px-4" type="submit" [disabled]="saving">
+          <span *ngIf="!saving">Save</span>
+          <span *ngIf="saving" class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+          <span *ngIf="saving">Saving…</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+  .object-fit-contain { object-fit: contain; }
+  .bg-light-subtle { background-color: rgba(0,0,0,.02); }
+</style>

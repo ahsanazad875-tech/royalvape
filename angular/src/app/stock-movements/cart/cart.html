@@ -1,0 +1,333 @@
+<div class="cart-page">
+  <!-- Mobile header (shows on small screens) -->
+  <div class="mobile-header d-lg-none mb-3">
+    <h5 class="fw-bold mb-3">
+      <i class="fas fa-shopping-basket me-2"></i>Point of Sale
+    </h5>
+  </div>
+
+  <!-- Main container with better responsive layout -->
+  <div class="cart-container">
+    <!-- LEFT: Product Catalog -->
+    <div class="products-section">
+      <div class="section-card">
+        <!-- Header with search and filters -->
+        <div class="section-header">
+          <h5 class="section-title mb-3">Products Catalog</h5>
+
+          <!-- Search and filters toolbar -->
+          <div class="search-toolbar">
+            <div class="search-wrapper">
+              <i class="fas fa-search search-icon"></i>
+              <input
+                type="text"
+                class="search-input"
+                placeholder="Search products..."
+                [(ngModel)]="search"
+                (input)="filter()"
+              />
+            </div>
+
+            <div class="filter-controls">
+              <label class="stock-filter">
+                <input
+                  type="checkbox"
+                  [(ngModel)]="showInStockOnly"
+                  (change)="filter()"
+                />
+                <span>In stock only</span>
+              </label>
+
+              <!-- Branch selector for admin -->
+              <select
+                *ngIf="isAdmin"
+                class="branch-select"
+                [(ngModel)]="branchId"
+                (change)="onBranchChanged()"
+              >
+                <option *ngFor="let b of branches" [value]="b.id">
+                  {{ b.name }}
+                </option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Admin stock info -->
+          <div class="admin-info" *ngIf="isAdmin">
+            <span class="text-muted"
+              >Branch: <strong>{{ selectedBranchName }}</strong></span
+            >
+            <span *ngIf="loadingStock" class="ms-2">
+              <i class="fas fa-circle-notch fa-spin"></i> Loading stock...
+            </span>
+          </div>
+        </div>
+
+        <!-- Products grid -->
+        <div class="products-grid" *ngIf="filtered.length">
+          <div class="product-card" *ngFor="let p of filtered">
+            <!-- Product image/icon -->
+            <div class="product-visual">
+              <img
+                *ngIf="imgSrc(p) as src; else productIcon"
+                [src]="src"
+                [alt]="p.productName || 'Product'"
+                class="product-image"
+              />
+              <ng-template #productIcon>
+                <div class="product-icon-wrapper">
+                  <i [class]="iconFor(p)"></i>
+                </div>
+              </ng-template>
+
+              <!-- Stock badge -->
+              <span
+                class="stock-badge"
+                [class.in-stock]="onHand(p) > 0"
+                [class.out-of-stock]="onHand(p) === 0"
+              >
+                {{ onHand(p) > 0 ? onHand(p) + ' in stock' : 'Out of stock' }}
+              </span>
+            </div>
+
+            <!-- Product info -->
+            <div class="product-info">
+              <h6 class="product-name">{{ p.productName }}</h6>
+              <p class="product-code">{{ p.productNo }}</p>
+              <span class="product-type">{{
+                p.productTypeName || 'General'
+              }}</span>
+            </div>
+
+            <!-- Price and action -->
+            <div class="product-footer">
+              <div class="product-price">
+                <span class="currency">{{ currencySymbol }}</span>
+                <span class="amount">{{
+                  p.sellingUnitPrice | number : '1.2-2'
+                }}</span>
+              </div>
+
+              <button
+                type="button"
+                class="btn-add-to-cart"
+                [class.added]="alreadyInCart(p)"
+                [disabled]="!loadingStock && onHand(p) <= 0"
+                (click)="addToCart(p)"
+              >
+                <i class="fas fa-plus icon-add"></i>
+                <i class="fas fa-check icon-check"></i>
+                <span class="btn-text">{{
+                  alreadyInCart(p) ? 'Added' : 'Add'
+                }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Empty state -->
+        <div class="empty-state" *ngIf="!filtered.length">
+          <i class="fas fa-search empty-icon"></i>
+          <p class="empty-title">No products found</p>
+          <p class="empty-subtitle">Try adjusting your search or filters</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Shopping Cart -->
+    <div class="cart-section">
+      <div class="section-card cart-card">
+        <!-- Cart header -->
+        <div class="cart-header">
+          <div class="d-flex align-items-center justify-content-between">
+            <h5 class="section-title">
+              <i class="fas fa-shopping-cart me-2"></i>
+              Cart
+              <span class="cart-count" *ngIf="lines.length">{{
+                lines.length
+              }}</span>
+            </h5>
+            <button
+              type="button"
+              class="btn-text-danger"
+              (click)="clear()"
+              *ngIf="lines.length"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+
+        <!-- Cart content -->
+        <div class="cart-content">
+          <!-- Empty cart -->
+          <div class="cart-empty" *ngIf="!lines.length">
+            <i class="fas fa-shopping-basket cart-empty-icon"></i>
+            <p class="cart-empty-text">Your cart is empty</p>
+            <p class="cart-empty-subtext">Add items from the catalog</p>
+          </div>
+
+          <!-- Cart items -->
+          <div class="cart-items" *ngIf="lines.length">
+            <div
+              class="cart-item-compact"
+              *ngFor="let l of lines; trackBy: trackByLine"
+            >
+              <!-- Compact item row -->
+              <div class="item-row">
+                <!-- Left: Image and name -->
+                <div class="item-info">
+                  <div class="item-image">
+                    <img
+                      *ngIf="imgSrc(l.product) as src; else itemIcon"
+                      [src]="src"
+                      [alt]="l.product.productName || 'Product'"
+                    />
+                    <ng-template #itemIcon>
+                      <div class="item-icon">
+                        <i [class]="iconFor(l.product)"></i>
+                      </div>
+                    </ng-template>
+                  </div>
+
+                  <div class="item-name-price">
+                    <h6
+                      class="item-name"
+                      [title]="l.product.productName"
+                    >
+                      {{ l.product.productName }}
+                    </h6>
+                    <div class="item-unit-price">
+                      {{ currencySymbol }}
+                      {{ l.unitPrice | number : '1.2-2' }}
+                      <span
+                        class="stock-indicator"
+                        [class.low-stock]="onHand(l.product) < 5"
+                      >
+                        ({{ onHand(l.product) }} left)
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Right: Controls -->
+                <div class="item-actions">
+                  <!-- Quantity control -->
+                  <div class="quantity-control-compact">
+                    <button
+                      type="button"
+                      class="qty-btn"
+                      (click)="dec(l)"
+                      [disabled]="l.quantity <= 1"
+                    >
+                      <i class="fas fa-minus"></i>
+                    </button>
+
+                    <input
+                      type="number"
+                      class="qty-input"
+                      [(ngModel)]="l.quantity"
+                      (ngModelChange)="qtyChanged(l)"
+                      [min]="1"
+                      [max]="onHand(l.product)"
+                    />
+
+                    <button
+                      type="button"
+                      class="qty-btn"
+                      (click)="inc(l)"
+                      [disabled]="l.quantity >= onHand(l.product)"
+                    >
+                      <i class="fas fa-plus"></i>
+                    </button>
+                  </div>
+
+                  <!-- Line total -->
+                  <div class="line-total-compact">
+                    {{ currencySymbol }}
+                    {{
+                      (l.quantity * l.unitPrice - (l.discountAmount || 0) > 0
+                        ? l.quantity * l.unitPrice - (l.discountAmount || 0)
+                        : 0) | number : '1.2-2'
+                    }}
+                  </div>
+
+                  <!-- Remove button -->
+                  <button
+                    type="button"
+                    class="btn-remove-compact"
+                    (click)="remove(l)"
+                    title="Remove"
+                  >
+                    <i class="fas fa-times"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Optional: Discount input (compact inline) -->
+              <div
+                class="discount-row"
+                *ngIf="isAdmin || l.discountAmount > 0"
+              >
+                <label class="discount-label">
+                  <i class="fas fa-tag"></i> Discount
+                </label>
+                <div class="discount-input-wrapper">
+                  <span class="discount-prefix">{{ currencySymbol }}</span>
+                  <input
+                    type="number"
+                    class="discount-input"
+                    [(ngModel)]="l.discountAmount"
+                    (ngModelChange)="discountChanged(l, $event)"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cart summary -->
+        <div class="cart-summary" *ngIf="lines.length">
+          <div class="summary-row">
+            <span class="summary-label">Subtotal</span>
+            <span class="summary-value">
+              {{ currencySymbol }} {{ totals.ex | number : '1.2-2' }}
+            </span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">
+              VAT ({{ (vatRate * 100) | number : '1.0-0' }}%)
+            </span>
+            <span class="summary-value">
+              {{ currencySymbol }} {{ totals.vat | number : '1.2-2' }}
+            </span>
+          </div>
+          <div class="summary-divider"></div>
+          <div class="summary-row summary-total">
+            <span class="summary-label">Total</span>
+            <span class="summary-value">
+              {{ currencySymbol }} {{ totals.inc | number : '1.2-2' }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Checkout button -->
+        <button
+          type="button"
+          class="btn-checkout"
+          (click)="checkout()"
+          [disabled]="!lines.length"
+        >
+          <i class="fas fa-credit-card me-2"></i>
+          Checkout
+          <span class="checkout-amount" *ngIf="lines.length">
+            {{ currencySymbol }} {{ totals.inc | number : '1.2-2' }}
+          </span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,121 @@
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form (ngSubmit)="save()" #f="ngForm" novalidate>
+      <div class="row g-3">
+
+        <!-- Name -->
+        <div class="col-md-6">
+          <label for="name" class="form-label">Name <span class="text-danger">*</span></label>
+          <input
+            id="name"
+            class="form-control"
+            [(ngModel)]="vm.name"
+            name="name"
+            required
+            maxlength="128"
+            [class.is-invalid]="f.submitted && !f.controls['name']?.valid" />
+          <div class="invalid-feedback">Name is required.</div>
+        </div>
+
+        <!-- Code -->
+        <div class="col-md-6">
+          <label for="code" class="form-label">Code <span class="text-danger">*</span></label>
+          <input
+            id="code"
+            class="form-control"
+            [(ngModel)]="vm.code"
+            name="code"
+            required
+            maxlength="32"
+            [class.is-invalid]="f.submitted && !f.controls['code']?.valid" />
+          <div class="invalid-feedback">Code is required.</div>
+        </div>
+
+        <!-- Status -->
+        <div class="col-md-6">
+          <label class="form-label d-block">Status</label>
+          <div class="d-flex align-items-center gap-3">
+            <div class="form-check">
+              <input
+                class="form-check-input"
+                type="radio"
+                name="isActive"
+                id="statusActive"
+                [value]="true"
+                [(ngModel)]="vm.isActive" />
+              <label class="form-check-label" for="statusActive">Active</label>
+            </div>
+            <div class="form-check">
+              <input
+                class="form-check-input"
+                type="radio"
+                name="isActive"
+                id="statusInactive"
+                [value]="false"
+                [(ngModel)]="vm.isActive" />
+              <label class="form-check-label" for="statusInactive">Inactive</label>
+            </div>
+          </div>
+        </div>
+
+        <!-- VAT % -->
+        <div class="col-md-6">
+          <label for="vatPerc" class="form-label">Default VAT %</label>
+          <div class="input-group">
+            <input
+              id="vatPerc"
+              type="number"
+              class="form-control text-end"
+              [(ngModel)]="vm.vatPerc"
+              name="vatPerc"
+              step="0.01"
+              min="0"
+              max="100"
+              (blur)="onVatChange?.()"
+              placeholder="e.g. 5 or 18" />
+            <span class="input-group-text">%</span>
+          </div>
+          <small class="text-muted">
+            This percentage will be used as the default VAT for this branch (0–100).
+          </small>
+        </div>
+
+      </div>
+
+      <!-- Footer actions -->
+      <div class="mt-4 d-flex align-items-center">
+        <button
+          *ngIf="isEdit"
+          type="button"
+          class="btn btn-outline-danger"
+          (click)="confirmDelete()"
+          [disabled]="saving || deleting"
+          abpPermission="POS.Branches.Delete">
+          <i class="fa fa-trash me-1"></i> Delete
+        </button>
+
+        <div class="ms-auto d-flex align-items-center gap-2">
+          <a
+            class="btn btn-secondary"
+            [routerLink]="['/branches']"
+            [class.disabled]="saving || deleting">
+            Back
+          </a>
+
+          <button
+            class="btn btn-primary"
+            type="submit"
+            [disabled]="saving || deleting || f.invalid">
+            <span *ngIf="saving">
+              <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+              {{ isEdit ? 'Updating…' : 'Creating…' }}
+            </span>
+            <span *ngIf="!saving">
+              {{ isEdit ? 'Save' : 'Save' }}
+            </span>
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>

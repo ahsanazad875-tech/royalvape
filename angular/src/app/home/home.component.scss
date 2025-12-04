@@ -1,0 +1,50 @@
+.dashboard-page {
+  .page-title {
+    font-size: 1.4rem;
+    font-weight: 600;
+  }
+
+  .dashboard-branch-filter {
+    min-width: 190px;
+  }
+
+  .dashboard-stat-card {
+    border: 1px solid var(--neutral-150);
+
+    .stat-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--neutral-500);
+    }
+
+    .stat-value {
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: var(--neutral-900);
+    }
+
+    .stat-subtitle {
+      margin-top: 0.25rem;
+      font-size: 0.8rem;
+      color: var(--neutral-500);
+    }
+
+    .stat-icon {
+      font-size: 1.2rem;
+      color: var(--primary-blue);
+    }
+  }
+
+  .dashboard-chart {
+    height: 260px;
+
+    canvas {
+      max-height: 220px;
+    }
+  }
+
+  .table-responsive {
+    border-radius: 0 0 0.75rem 0.75rem;
+  }
+}

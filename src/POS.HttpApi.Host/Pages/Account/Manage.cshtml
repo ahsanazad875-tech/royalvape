@@ -1,0 +1,16 @@
+﻿@page
+@using Volo.Abp.AspNetCore.Mvc.UI.Theming
+@inject ITheme Theme
+
+@{
+    // use empty layout so no extra chrome
+    Layout = Theme.GetEmptyLayout();
+    Response.StatusCode = 404; // or 410 if you prefer "gone"
+}
+
+<div class="container text-center mt-5">
+    <h3>Registration is disabled.</h3>
+    <p>
+        <a href="~/Account/Login">Back to login</a>
+    </p>
+</div>

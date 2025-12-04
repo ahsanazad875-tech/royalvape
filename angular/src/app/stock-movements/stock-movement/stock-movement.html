@@ -1,0 +1,225 @@
+<div class="sm-card">
+  <div class="sm-header">
+    <div>
+      <h2 class="sm-title">Stock Movements</h2>
+      <p class="sm-subtitle">Royal Vapes – Sales &amp; Inventory</p>
+    </div>
+
+    <span class="sm-summary" *ngIf="totalCount() > 0">
+      Showing <b>{{ visibleFrom() }}</b>–<b>{{ visibleTo() }}</b> of
+      <b>{{ totalCount() }}</b> rows
+    </span>
+  </div>
+
+  <!-- Collapsible Filters -->
+  <div class="filter-card">
+    <div class="filter-card-header" (click)="filtersCollapsed = !filtersCollapsed">
+      <h3>Filters</h3>
+      <span class="toggle">{{ filtersCollapsed ? 'Show' : 'Hide' }}</span>
+    </div>
+
+    <div class="filter-card-body" *ngIf="!filtersCollapsed">
+      <form [formGroup]="form" class="filter-grid" (ngSubmit)="search()">
+
+        <div class="fg-item" *ngIf="currentUser.roles.includes('admin')">
+          <label class="form-label" for="branchId">Branch</label>
+          <select
+            id="branchId"
+            class="form-select form-select-sm"
+            formControlName="branchId"
+          >
+            <option value="">All</option>
+            <option *ngFor="let b of branches()" [value]="b.id">{{ b.name }}</option>
+          </select>
+        </div>
+
+        <div class="fg-item">
+          <label class="form-label" for="productId">Product</label>
+          <select
+            id="productId"
+            class="form-select form-select-sm"
+            formControlName="productId"
+          >
+            <option value="">All</option>
+            <option *ngFor="let p of products()" [value]="p.id">
+              {{ p.productName }}
+            </option>
+          </select>
+        </div>
+
+        <div class="fg-item">
+          <label class="form-label" for="productTypeId">Product Type</label>
+          <select
+            id="productTypeId"
+            class="form-select form-select-sm"
+            formControlName="productTypeId"
+          >
+            <option value="">All</option>
+            <option *ngFor="let t of productTypes()" [value]="t.id">
+              {{ t.type }}
+            </option>
+          </select>
+        </div>
+
+        <div class="fg-item">
+          <label class="form-label" for="movementType">Movement Type</label>
+          <select
+            id="movementType"
+            class="form-select form-select-sm"
+            formControlName="stockMovementType"
+          >
+            <option value="">All</option>
+            <option *ngFor="let t of movementTypeOptions" [value]="t.value">
+              {{ t.label }}
+            </option>
+          </select>
+        </div>
+
+        <div class="fg-item">
+          <label class="form-label" for="fromDate">From</label>
+          <input
+            id="fromDate"
+            type="datetime-local"
+            class="form-control form-control-sm"
+            formControlName="dateFrom"
+          />
+        </div>
+
+        <div class="fg-item">
+          <label class="form-label" for="toDate">To</label>
+          <input
+            id="toDate"
+            type="datetime-local"
+            class="form-control form-control-sm"
+            formControlName="dateTo"
+          />
+        </div>
+
+        <!-- Checkbox -->
+        <div class="fg-item fg-check">
+          <div class="form-check">
+            <input
+              type="checkbox"
+              class="form-check-input"
+              id="chkCancelled"
+              formControlName="includeCancelled"
+            />
+            <label class="form-check-label" for="chkCancelled">
+              Include cancelled
+            </label>
+          </div>
+        </div>
+
+        <!-- Buttons -->
+        <div class="fg-item fg-actions">
+          <button
+            type="submit"
+            class="btn btn-primary btn-sm"
+            [disabled]="loading()"
+          >
+            Search
+          </button>
+          <button
+            type="button"
+            class="btn btn-outline-secondary btn-sm"
+            (click)="reset()"
+            [disabled]="loading()"
+          >
+            Reset
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- States -->
+  <div *ngIf="loading()" class="sm-state sm-state-loading">Loading…</div>
+  <div *ngIf="!loading() && totalCount() === 0" class="sm-state sm-state-empty">
+    No stock movements found.
+  </div>
+
+    <!-- Table -->
+  <div class="table-wrap" *ngIf="!loading() && rows().length">
+    <table class="table table-sm table-sticky-header sm-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Movement No.</th>
+          <th>Branch</th>
+          <th>Product</th>
+          <th>Product Type</th>
+          <th>Movement Type</th>
+          <th class="text-end">Qty (±)</th>
+          <th class="text-end">Unit Price</th>
+          <th class="text-end">Amount Excl VAT</th>
+          <th class="text-end">Amount VAT</th>
+          <th class="text-end">Amount Incl VAT</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let r of rows(); trackBy: trackRow">
+          <td>{{ r.movementDate | date: 'yyyy-MM-dd HH:mm' }}</td>
+          <td>{{ r.stockMovementNo }}</td>
+          <td>{{ r.branchName }}</td>
+          <td>{{ r.productName }}</td>
+          <td>{{ r.productType }}</td>
+          <td>
+            <span [class]="'chip ' + movementTypeClass(r.stockMovementType)">
+              {{ movementTypeLabel(r.stockMovementType) }}
+            </span>
+          </td>
+          <td class="text-end">{{ r.quantitySigned | number: '1.0-2' }}</td>
+          <td class="text-end">{{ (r.unitPrice ?? 0) | number: '1.0-2' }}</td>
+          <td class="text-end">{{ (r.amountExclVat ?? 0) | number: '1.0-2' }}</td>
+          <td class="text-end">{{ (r.amountVat ?? 0) | number: '1.0-2' }}</td>
+          <td class="text-end">{{ (r.amountInclVat ?? 0) | number: '1.0-2' }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div class="sm-footer" *ngIf="totalCount() > 0">
+    <div class="sm-footer-left">
+      <label class="me-2">Rows per page</label>
+      <select
+        class="form-select form-select-sm d-inline-block w-auto"
+        [value]="pageSize()"
+        (change)="onPageSizeChange($any($event.target).value)"
+      >
+        <option [value]="10">10</option>
+        <option [value]="25">25</option>
+        <option [value]="50">50</option>
+        <option [value]="100">100</option>
+      </select>
+    </div>
+
+    <div class="sm-footer-middle">
+      {{ visibleFrom() }}–{{ visibleTo() }} of {{ totalCount() }}
+    </div>
+
+    <div class="sm-footer-right">
+      <button
+        type="button"
+        class="btn btn-sm btn-outline-secondary me-1"
+        (click)="changePage(-1)"
+        [disabled]="pageIndex() === 0"
+      >
+        ‹ Prev
+      </button>
+
+      <span class="mx-2">
+        Page {{ pageIndex() + 1 }}
+      </span>
+
+      <button
+        type="button"
+        class="btn btn-sm btn-outline-secondary"
+        (click)="changePage(1)"
+        [disabled]="visibleTo() >= totalCount()"
+      >
+        Next ›
+      </button>
+    </div>
+  </div>
+</div>
