@@ -5,6 +5,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 using Serilog.Events;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+
 
 namespace POS;
 
@@ -39,9 +42,18 @@ public class Program
                         .WriteTo.Async(c => c.Console())
                         .WriteTo.Async(c => c.AbpStudio(services));
                 });
+            builder.Services.AddHealthChecks()
+                    .AddCheck("self", () => HealthCheckResult.Healthy());
+
             await builder.AddApplicationAsync<POSHttpApiHostModule>();
             var app = builder.Build();
             await app.InitializeApplicationAsync();
+
+            app.MapHealthChecks("/health-status", new HealthCheckOptions
+            {
+                Predicate = _ => true
+            });
+
             await app.RunAsync();
             return 0;
         }
