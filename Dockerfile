@@ -7,7 +7,7 @@ WORKDIR /src
 # Copy everything including pre-installed libs
 COPY . .
 
-# Restore and build
+# Restore and publish
 RUN dotnet restore
 RUN dotnet publish ./src/POS.HttpApi.Host/POS.HttpApi.Host.csproj -c Release -o /app/publish
 

@@ -267,7 +267,7 @@ src/POS.Blazor.Server/Logs/*
 src/POS.Blazor.Server.Tiered/Logs/*
 
 # Use abp install-libs to restore.
-**/wwwroot/libs/*
+# **/wwwroot/libs/*
 
 # IdentityServer temp files
 tempkey.rsa
