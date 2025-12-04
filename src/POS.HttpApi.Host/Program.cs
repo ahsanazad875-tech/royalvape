@@ -1,12 +1,14 @@
-﻿using System;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Builder;
+﻿using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 using Serilog.Events;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
+using System;
+using System.IO;
+using System.Threading.Tasks;
 
 
 namespace POS;
@@ -44,6 +46,9 @@ public class Program
                 });
             builder.Services.AddHealthChecks()
                     .AddCheck("self", () => HealthCheckResult.Healthy());
+            builder.Services.AddDataProtection()
+                    .PersistKeysToFileSystem(new DirectoryInfo("/app/dataprotection-keys"))
+                    .SetApplicationName("RoyalVape");
 
             await builder.AddApplicationAsync<POSHttpApiHostModule>();
             var app = builder.Build();
