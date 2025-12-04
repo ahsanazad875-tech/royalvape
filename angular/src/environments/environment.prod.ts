@@ -1,9 +1,9 @@
 import { Environment } from '@abp/ng.core';
 
-const baseUrl = 'http://localhost:4200';
+const baseUrl = 'https://royalvape.netlify.app';
 
 const oAuthConfig = {
-  issuer: 'https://localhost:44348/',
+  issuer: 'https://royalvape.onrender.com',
   redirectUri: baseUrl,
   clientId: 'POS_App',
   responseType: 'code',
@@ -20,7 +20,7 @@ export const environment = {
   oAuthConfig,
   apis: {
     default: {
-      url: 'https://localhost:44348',
+      url: 'https://royalvape.onrender.com',
       rootNamespace: 'POS',
     },
     AbpAccountPublic: {
@@ -30,6 +30,6 @@ export const environment = {
   },
   remoteEnv: {
     url: '/getEnvConfig',
-    mergeStrategy: 'deepmerge'
-  }
+    mergeStrategy: 'deepmerge',
+  },
 } as Environment;
