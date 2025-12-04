@@ -10,7 +10,6 @@ using Microsoft.OpenApi.Models;
 using OpenIddict.Server.AspNetCore;
 using OpenIddict.Validation.AspNetCore;
 using POS.EntityFrameworkCore;
-using POS.HealthChecks;
 using POS.MultiTenancy;
 using System;
 using System.Collections.Generic;
@@ -253,7 +252,7 @@ public class POSHttpApiHostModule : AbpModule
 
     private void ConfigureHealthChecks(ServiceConfigurationContext context)
     {
-        context.Services.AddPOSHealthChecks();
+
     }
 
     public override void OnApplicationInitialization(ApplicationInitializationContext context)
