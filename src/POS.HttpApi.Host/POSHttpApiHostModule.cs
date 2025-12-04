@@ -170,23 +170,31 @@ public class POSHttpApiHostModule : AbpModule
     {
         Configure<AbpBundlingOptions>(options =>
         {
+            // Override LeptonXLite global styles
             options.StyleBundles.Configure(
                 LeptonXLiteThemeBundles.Styles.Global,
                 bundle =>
                 {
-                    bundle.AddFiles("/global-styles.css");
+
+                    // Optional: Add your own CSS file under wwwroot/css/
+                    // bundle.AddFiles("/css/account.css");
                 }
             );
 
+            // Override LeptonXLite global scripts
             options.ScriptBundles.Configure(
                 LeptonXLiteThemeBundles.Scripts.Global,
                 bundle =>
                 {
-                    bundle.AddFiles("/global-scripts.js");
+
+                    // Optional: Add your own JS file under wwwroot/js/
+                    // bundle.AddFiles("/js/account.js");
                 }
             );
         });
     }
+
+
 
 
     private void ConfigureVirtualFileSystem(ServiceConfigurationContext context)
