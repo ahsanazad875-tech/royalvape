@@ -4,19 +4,20 @@
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
-# Copy all files
+# Copy solution
 COPY . .
 
-# Restore tools (needed for ABP CLI)
-RUN dotnet tool restore
+# Install ABP CLI globally
+RUN dotnet tool install -g Volo.Abp.Cli
+ENV PATH="$PATH:/root/.dotnet/tools"
 
 # Install ABP static libraries
 RUN abp install-libs
 
-# Bundle ABP styles/scripts (generates wwwroot/libs)
+# (Optional) Bundle ABP resources (only needed if using Razor pages)
 RUN abp bundle
 
-# Restore & publish the HttpApi.Host project
+# Restore & publish backend
 RUN dotnet restore ./src/POS.HttpApi.Host/POS.HttpApi.Host.csproj
 RUN dotnet publish ./src/POS.HttpApi.Host/POS.HttpApi.Host.csproj -c Release -o /app/publish
 
@@ -28,7 +29,7 @@ WORKDIR /app
 
 COPY --from=build /app/publish ./
 
-# Render sets PORT env var, bind Kestrel to that
+# Render sets PORT automatically
 ENV ASPNETCORE_URLS=http://0.0.0.0:${PORT}
 ENV ASPNETCORE_ENVIRONMENT=Production
 
