@@ -1,17 +1,18 @@
-// src/environments/environment.prod.ts
 import { Environment } from '@abp/ng.core';
 
 const baseUrl = 'https://royalvape.netlify.app';
 
 const oAuthConfig = {
-  issuer: 'https://royalvape.onrender.com',   // no trailing slash
-  redirectUri: baseUrl,                       // https://royalvape.netlify.app
+  // NOTE: trailing slash added to match the discovery document
+  issuer: 'https://royalvape.onrender.com/',
+  redirectUri: baseUrl,
   clientId: 'POS_App',
   responseType: 'code',
   scope: 'offline_access POS',
   requireHttps: true,
-  // VERY IMPORTANT: avoid “invalid issuer” because of slash issues
-  strictDiscoveryDocumentValidation: false
+
+  // Relax issuer validation so small differences (like /) don’t break things
+  skipIssuerCheck: true
 };
 
 export const environment = {
