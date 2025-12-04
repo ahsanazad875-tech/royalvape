@@ -47,12 +47,14 @@ public class Program
 
             await builder.AddApplicationAsync<POSHttpApiHostModule>();
             var app = builder.Build();
-            await app.InitializeApplicationAsync();
 
             app.MapHealthChecks("/health-status", new HealthCheckOptions
             {
                 Predicate = _ => true
             });
+
+            await app.InitializeApplicationAsync();
+
 
             await app.RunAsync();
             return 0;
