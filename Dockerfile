@@ -7,8 +7,8 @@ WORKDIR /src
 # Copy everything
 COPY . .
 
-# Install ABP CLI
-RUN dotnet tool install -g Volo.Abp.Cli
+# Install ABP CLI with a specific working version
+RUN dotnet tool install -g Volo.Abp.Cli --version 8.3.3
 ENV PATH="$PATH:/root/.dotnet/tools"
 
 # Restore solution BEFORE ABP commands
