@@ -1,3 +1,4 @@
+// src/environments/environment.ts
 import { Environment } from '@abp/ng.core';
 
 const baseUrl = 'http://localhost:4200';

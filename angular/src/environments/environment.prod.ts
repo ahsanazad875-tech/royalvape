@@ -1,3 +1,4 @@
+// environment.prod.ts
 import { Environment } from '@abp/ng.core';
 
 const baseUrl = 'https://royalvape.netlify.app';
@@ -15,7 +16,7 @@ export const environment = {
   production: true,
   application: {
     baseUrl,
-    name: 'POS',
+    name: 'Royal Vapes',
   },
   oAuthConfig,
   apis: {
@@ -27,9 +28,5 @@ export const environment = {
       url: oAuthConfig.issuer,
       rootNamespace: 'AbpAccountPublic',
     },
-  },
-  remoteEnv: {
-    url: '/getEnvConfig',
-    mergeStrategy: 'deepmerge',
   },
 } as Environment;
