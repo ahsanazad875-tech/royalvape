@@ -46,6 +46,7 @@ public class Program
                 });
             builder.Services.AddHealthChecks()
                     .AddCheck("self", () => HealthCheckResult.Healthy());
+
             builder.Services.AddDataProtection()
                     .PersistKeysToFileSystem(new DirectoryInfo("/app/dataprotection-keys"))
                     .SetApplicationName("RoyalVape");
