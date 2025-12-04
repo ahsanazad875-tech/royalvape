@@ -4,15 +4,12 @@ const baseUrl = 'https://royalvape.netlify.app';
 
 const oAuthConfig = {
   // NOTE: trailing slash added to match the discovery document
-  issuer: 'https://royalvape.onrender.com/',
+  issuer: 'https://royalvape.onrender.com',
   redirectUri: `${baseUrl}/signin-oidc`,
   clientId: 'POS_App',
   responseType: 'code',
-  scope: 'offline_access POS',
+  scope: 'openid profile email offline_access POS',
   requireHttps: true,
-
-  // Relax issuer validation so small differences (like /) don’t break things
-  skipIssuerCheck: true
 };
 
 export const environment = {
