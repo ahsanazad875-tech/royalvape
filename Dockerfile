@@ -4,8 +4,17 @@
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
-# Copy everything from repo
+# Copy all files
 COPY . .
+
+# Restore tools (needed for ABP CLI)
+RUN dotnet tool restore
+
+# Install ABP static libraries
+RUN abp install-libs
+
+# Bundle ABP styles/scripts (generates wwwroot/libs)
+RUN abp bundle
 
 # Restore & publish the HttpApi.Host project
 RUN dotnet restore ./src/POS.HttpApi.Host/POS.HttpApi.Host.csproj
