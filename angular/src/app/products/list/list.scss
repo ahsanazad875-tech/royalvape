@@ -199,6 +199,22 @@
   text-overflow: ellipsis;
 }
 
+.product-table-container {
+  width: 100%;
+  overflow-x: auto; /* enable horizontal scroll */
+}
+
+.product-table {
+  table-layout: fixed; /* force columns to stay in one line */
+  white-space: nowrap; /* DO NOT wrap text */
+}
+
+.product-table th,
+.product-table td {
+  white-space: nowrap !important; /* absolutely prevent text wrap */
+}
+
+
 /* Disable mobile stacked card mode */
 @media (max-width: 540px) {
   .products-table thead {
