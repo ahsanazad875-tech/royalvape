@@ -152,8 +152,8 @@
           <th class="text-end">Qty (±)</th>
           <th class="text-end">Unit Price</th>
           <th class="text-end">Amount Excl VAT</th>
-          <th class="text-end">Amount VAT</th>
-          <th class="text-end">Amount Incl VAT</th>
+          <!-- <th class="text-end">Amount VAT</th>
+          <th class="text-end">Amount Incl VAT</th> -->
         </tr>
       </thead>
       <tbody>
@@ -171,8 +171,8 @@
           <td class="text-end">{{ r.quantitySigned | number: '1.0-2' }}</td>
           <td class="text-end">{{ (r.unitPrice ?? 0) | number: '1.0-2' }}</td>
           <td class="text-end">{{ (r.amountExclVat ?? 0) | number: '1.0-2' }}</td>
-          <td class="text-end">{{ (r.amountVat ?? 0) | number: '1.0-2' }}</td>
-          <td class="text-end">{{ (r.amountInclVat ?? 0) | number: '1.0-2' }}</td>
+          <!-- <td class="text-end">{{ (r.amountVat ?? 0) | number: '1.0-2' }}</td>
+          <td class="text-end">{{ (r.amountInclVat ?? 0) | number: '1.0-2' }}</td> -->
         </tr>
       </tbody>
     </table>

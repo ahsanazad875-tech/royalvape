@@ -6,6 +6,18 @@
   border-radius: 12px;
   padding: 1.25rem 1.5rem;
   box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05);
+
+  /* IMPORTANT FIXES */
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+
+  * {
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
+  }
 }
 
 .sm-header {
@@ -77,7 +89,7 @@
 
 .filter-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(170px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr)); /* FIXED */
   gap: 0.75rem 0.9rem;
   align-items: end;
 
@@ -96,7 +108,7 @@
     }
   }
 
-
+  /* Action Buttons */
   .fg-actions {
     display: inline-flex;
     flex-direction: row !important;
@@ -111,10 +123,11 @@
 .table-wrap {
   margin-top: 0.5rem;
   overflow-x: auto;
+  width: 100%;
 }
 
 .sm-table {
-  font-variant-numeric: tabular-nums; // align numbers nicely
+  font-variant-numeric: tabular-nums;
 
   tbody td {
     white-space: nowrap;
@@ -127,21 +140,18 @@
   padding: 0.6rem 0.2rem;
   font-size: 0.9rem;
   color: var(--neutral-600);
-}
 
-.sm-state-loading {
-  font-style: italic;
-}
-
-.sm-state-empty {
-  font-style: italic;
+  &.sm-state-loading,
+  &.sm-state-empty {
+    font-style: italic;
+  }
 }
 
 /* ============== Responsive ============== */
 
 @media (max-width: 900px) {
   .filter-grid {
-    grid-template-columns: repeat(2, minmax(170px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr)); /* FIXED */
   }
 }
 
