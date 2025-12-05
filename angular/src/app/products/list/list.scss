@@ -1,11 +1,10 @@
 /* ============================================
-   PRODUCTS PAGE — COMPLETE STYLING
-   CLEAN MODERN UI (NO TEXT WRAPPING)
-=============================================== */
+   PRODUCTS PAGE — FINAL CLEAN STYLING
+   No Wrapping, No Overlapping, Smooth Scroll
+============================================= */
 
-/* ============== Main Card ============== */
-
-.products-card {
+/* Main Card */
+.product-card {
   background: #fff;
   border: 1px solid var(--neutral-150);
   border-radius: 14px;
@@ -13,116 +12,108 @@
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
 }
 
-/* ============== Header ============== */
-
-.products-header {
-  display: flex;
-  align-items: center;
-  margin-bottom: 1rem;
-
-  .btn-primary {
-    font-weight: 500;
-    padding: 0.55rem 1.1rem;
-    border-radius: 10px;
-
-    i {
-      font-size: 0.9rem;
-    }
-  }
-
-  .total-count {
-    margin-left: auto;
-    font-size: 0.85rem;
-    color: var(--neutral-500);
-
-    strong {
-      color: var(--neutral-800);
-    }
-  }
+/* Header */
+.product-header .btn-add-product {
+  font-weight: 500;
+  padding: 0.55rem 1.1rem;
+  border-radius: 10px;
+}
+.product-header .btn-add-product i {
+  font-size: 0.9rem;
+}
+.product-total {
+  margin-left: auto;
+  font-size: 0.85rem;
+  color: var(--neutral-500);
+}
+.product-total strong {
+  color: var(--neutral-800);
 }
 
-/* ============== Table Wrapper ============== */
+/* ============================================
+   TABLE — THE FIX THAT MAKES IT WORK PERFECTLY
+============================================= */
 
-.products-table-wrap {
-  margin-top: 0.5rem;
-  overflow-x: auto;
-}
-
-/* ============== Table Style ============== */
-
-.products-table {
+/* Wrapper enables horizontal scroll */
+.product-table-container {
   width: 100%;
-  font-variant-numeric: tabular-nums;
+  overflow-x: auto !important;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  white-space: nowrap !important;
+}
+
+/* Prevent Bootstrap from wrapping inside responsive table */
+.table-responsive {
+  white-space: nowrap !important;
+}
+
+/* Table grows horizontally instead of squeezing */
+.product-table {
+  width: max-content !important;
   border-collapse: separate;
   border-spacing: 0 6px;
-
-  thead th {
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    font-weight: 600;
-    color: var(--neutral-600);
-    white-space: nowrap;
-    padding: 0.75rem 0.75rem;
-    background: #fff;
-    border-bottom: 1px solid var(--neutral-150);
-  }
-
-  tbody tr {
-    background: #fff;
-    border: 1px solid var(--neutral-100);
-    border-radius: 10px;
-    transition: 0.15s ease;
-  }
-
-  tbody tr:hover {
-    background: var(--neutral-25);
-  }
-
-  tbody td {
-    padding: 0.75rem;
-    vertical-align: middle;
-    white-space: nowrap !important;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .text-end {
-    padding-right: 1rem !important;
-  }
 }
 
-/* ============== Loading & Empty States ============== */
+/* Header */
+.product-table thead th {
+  white-space: nowrap !important;
+  padding: 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--neutral-600);
+  background: #fff;
+  border-bottom: 1px solid var(--neutral-150);
+}
 
-.state-row {
+/* Rows */
+.product-table tbody tr {
+  background: #fff;
+  border: 1px solid var(--neutral-100);
+  border-radius: 10px;
+  transition: 0.15s ease;
+}
+.product-table tbody tr:hover {
+  background: var(--neutral-25);
+}
+
+/* Cells (Final Fix: No wrap, no overlap) */
+.product-table td {
+  padding: 0.75rem;
+  vertical-align: middle;
+  white-space: nowrap !important;  /* NEVER wrap */
+  overflow: visible !important;     /* NEVER hide text */
+  text-overflow: unset !important;  /* NO ellipsis */
+}
+
+/* Right-aligned actions */
+.product-actions {
+  padding-right: 1rem !important;
+}
+
+/* ============================================
+   Loading / Empty States
+============================================= */
+.loading-row,
+.no-data-row {
   text-align: center;
   padding: 2rem 0;
-
-  .spinner-border {
-    margin-right: 0.4rem;
-  }
-
-  &.loading {
-    font-style: italic;
-    color: var(--neutral-600);
-  }
-
-  &.empty {
-    color: var(--neutral-400);
-    font-style: italic;
-  }
+  font-style: italic;
+  color: var(--neutral-500);
 }
 
-/* ============== Product Thumbnail ============== */
-
+/* ============================================
+   Thumbnails
+============================================= */
 .product-thumbnail {
   width: 28px;
   height: 28px;
   object-fit: cover;
   border-radius: 6px;
-  margin-right: 8px;
   border: 1px solid var(--neutral-150);
+  margin-right: 8px;
 }
-
 .product-placeholder-icon {
   width: 28px;
   height: 28px;
@@ -132,98 +123,65 @@
   align-items: center;
   justify-content: center;
   color: var(--neutral-500);
-
-  i {
-    font-size: 0.85rem;
-  }
+}
+.product-placeholder-icon i {
+  font-size: 0.85rem;
 }
 
-/* ============== Edit Button ============== */
-
-.btn-edit-sm {
-  padding: 0.3rem 0.45rem !important;
+/* ============================================
+   Edit Button
+============================================= */
+.product-edit-btn {
+  padding: 0.35rem 0.5rem !important;
   border-radius: 8px;
   font-size: 0.8rem;
-
-  i {
-    font-size: 0.85rem;
-  }
+}
+.product-edit-btn i {
+  font-size: 0.85rem;
 }
 
-/* ============== Pagination ============== */
-
-.products-pagination {
+/* ============================================
+   Pagination
+============================================= */
+.pagination-container {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   margin-top: 1.5rem;
   gap: 0.75rem;
-
-  .rows-label {
-    font-size: 0.8rem;
-    color: var(--neutral-500);
-  }
-
-  select {
-    min-width: 70px;
-  }
-
-  .page-info {
-    font-size: 0.85rem;
-    color: var(--neutral-600);
-  }
-
-  .pagination-buttons {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-
-    .btn {
-      border-radius: 8px;
-      padding: 0.25rem 0.7rem !important;
-      font-size: 0.8rem;
-    }
-  }
+}
+.pagination-rows span {
+  font-size: 0.8rem;
+  color: var(--neutral-500);
+}
+.pagination-select {
+  min-width: 70px;
+}
+.pagination-count {
+  font-size: 0.85rem;
+  color: var(--neutral-600);
+}
+.pagination-buttons .btn {
+  border-radius: 8px;
+  padding: 0.25rem 0.7rem !important;
+  font-size: 0.8rem;
+}
+.pagination-page {
+  font-size: 0.85rem;
 }
 
-/* ============================================================
-   IMPORTANT — STOP TEXT FROM WRAPPING & STOP MOBILE STACKING
-============================================================== */
-
-/* No text wrapping anywhere */
-.products-table td,
-.products-table th {
-  white-space: nowrap !important;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.product-table-container {
-  width: 100%;
-  overflow-x: auto; /* enable horizontal scroll */
-}
-
-.product-table {
-  table-layout: fixed; /* force columns to stay in one line */
-  white-space: nowrap; /* DO NOT wrap text */
-}
-
-.product-table th,
-.product-table td {
-  white-space: nowrap !important; /* absolutely prevent text wrap */
-}
-
-
-/* Disable mobile stacked card mode */
+/* ============================================
+   Disable Bootstrap Mobile Stacking
+============================================= */
 @media (max-width: 540px) {
-  .products-table thead {
+  .product-table thead {
     display: table-header-group !important;
   }
-  .products-table tbody tr {
+  .product-table tbody tr {
     display: table-row !important;
   }
-  .products-table tbody td {
+  .product-table tbody td {
     display: table-cell !important;
   }
 }
