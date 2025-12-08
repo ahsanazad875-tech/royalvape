@@ -58,6 +58,9 @@
                 class="product-thumbnail me-2"
                 *ngIf="imgSrc(p) as src; else prodIcon"
                 [src]="src"
+                width="36"
+                height="36"
+                loading="lazy"
                 [alt]="p.productName || 'Product'"
               />
               {{ p.productNo + ' ' + p.productName }}
