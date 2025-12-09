@@ -28,6 +28,7 @@ export const environment = {
       url: oAuthConfig.issuer,
       rootNamespace: 'AbpAccountPublic',
     },
+    
   },
   remoteServiceErrorHandler: {
     showDetailedErrors: false,
