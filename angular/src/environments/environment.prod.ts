@@ -1,6 +1,6 @@
 import { Environment } from '@abp/ng.core';
 
-const baseUrl = 'https://royalvape.netlify.app';
+const baseUrl = 'https://royalvape.vercel.app';
 
 const oAuthConfig = {
   // NOTE: trailing slash added to match the discovery document
