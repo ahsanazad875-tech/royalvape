@@ -22,7 +22,6 @@
     "@abp/ng.tenant-management": "~9.3.1",
     "@abp/ng.theme.lepton-x": "~4.3.1",
     "@abp/ng.theme.shared": "~9.3.1",
-
     "@angular/animations": "~20.0.0",
     "@angular/common": "~20.0.0",
     "@angular/compiler": "~20.0.0",
@@ -34,6 +33,7 @@
     "@angular/router": "~20.0.0",
     "@swimlane/ngx-datatable": "21.0.0",
     "chart.js": "^4.5.1",
+    "ng-zorro-antd": "^20.4.3",
     "ng2-charts": "^7.0.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.0.0",

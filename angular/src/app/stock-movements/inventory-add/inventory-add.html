@@ -191,19 +191,25 @@
                 <tr *ngFor="let row of vm.details; let i = index">
                   <!-- Product -->
                   <td>
-                    <select
-                      class="form-select form-select-sm"
-                      [(ngModel)]="row.productId"
-                      name="product-{{ i }}"
-                      (ngModelChange)="onProductChange(i)"
-                      required
-                    >
-                      <option [ngValue]="null" disabled>Select product</option>
-                      <option *ngFor="let p of products" [ngValue]="p.id">
-                        {{ p.productName }}
-                      </option>
-                    </select>
-                  </td>
+  <nz-select
+    style="width: 100%"
+    nzSize="small"
+    nzShowSearch
+    nzAllowClear
+    nzPlaceHolder="Select product"
+    [(ngModel)]="row.productId"
+    name="product-{{ i }}"
+    (ngModelChange)="onProductChange(i)"
+    required
+  >
+    <nz-option
+      *ngFor="let p of products"
+      [nzValue]="p.id"
+      [nzLabel]="p.productName"
+    ></nz-option>
+  </nz-select>
+</td>
+
 
                   <!-- UOM -->
                   <td>

@@ -8,10 +8,11 @@ import {
   CreateUpdateStockMovementDetailDto,
   CreateUpdateStockMovementHeaderDto,
   StockMovementService,
-  StockMovementType
+  StockMovementType,
 } from 'src/app/proxy/stock-movements';
 import { BranchService, BranchDto } from 'src/app/proxy/branches';
 import { ConfigStateService } from '@abp/ng.core';
+import { forkJoin } from 'rxjs';
 
 type CartLine = {
   product: ProductDto;
@@ -25,17 +26,26 @@ type CartLine = {
   standalone: true,
   imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './cart.html',
-  styleUrls: ['./cart.scss']
+  styleUrls: ['./cart.scss'],
 })
 export class Cart implements OnInit {
   products: ProductDto[] = [];
   filtered: ProductDto[] = [];
   branches: BranchDto[] = [];
+
   search = '';
   branchId?: string;
+
   lines: CartLine[] = [];
   vatRate = 0;
   isAdmin = false;
+
+  customerName = '';
+
+  // pagination (client-side)
+  pageSizeOptions = [8, 12, 24, 48];
+  pageSize = 8;
+  currentPage = 1;
 
   // Currency symbol
   currencySymbol: string =
@@ -48,18 +58,21 @@ export class Cart implements OnInit {
   showInStockOnly = false;
   loadingStock = false;
 
+  // API base for images
+  apiBase = ((environment as any)?.apis?.default?.url || '').replace(/\/+$/, '');
+
   private typeIcons: Record<string, string> = {
-    'device': 'fa-solid fa-mobile-screen-button',
-    'mod': 'fa-solid fa-mobile-screen',
-    'pod': 'fa-solid fa-battery-three-quarters',
-    'coil': 'fa-solid fa-screwdriver-wrench',
+    device: 'fa-solid fa-mobile-screen-button',
+    mod: 'fa-solid fa-mobile-screen',
+    pod: 'fa-solid fa-battery-three-quarters',
+    coil: 'fa-solid fa-screwdriver-wrench',
     'e-liquid': 'fa-solid fa-droplet',
     'e liquid': 'fa-solid fa-droplet',
-    'juice': 'fa-solid fa-bottle-droplet',
-    'accessory': 'fa-solid fa-plug',
-    'charger': 'fa-solid fa-bolt',
-    'tank': 'fa-solid fa-flask',
-    'battery': 'fa-solid fa-battery-full'
+    juice: 'fa-solid fa-bottle-droplet',
+    accessory: 'fa-solid fa-plug',
+    charger: 'fa-solid fa-bolt',
+    tank: 'fa-solid fa-flask',
+    battery: 'fa-solid fa-battery-full',
   };
 
   constructor(
@@ -67,7 +80,7 @@ export class Cart implements OnInit {
     private stockSvc: StockMovementService,
     private branchSvc: BranchService,
     private config: ConfigStateService,
-    private router: Router
+    private router: Router,
   ) {}
 
   ngOnInit(): void {
@@ -86,29 +99,33 @@ export class Cart implements OnInit {
     }
 
     if (this.isAdmin) {
-      this.branchSvc.getList({ skipCount: 0, maxResultCount: 1000 }).subscribe(res => {
-        this.branches = res.items ?? [];
-        this.branchId = this.branches[0]?.id;
+      this.branchSvc
+        .getList({ skipCount: 0, maxResultCount: 1000 })
+        .subscribe(res => {
+          this.branches = res.items ?? [];
+          this.branchId = this.branches[0]?.id;
 
-        const first = this.branches[0] as any;
-        if (first && first.vatPerc != null) {
-          this.vatRate = Number(first.vatPerc / 100) || this.vatRate;
-        }
+          const first = this.branches[0] as any;
+          if (first && first.vatPerc != null) {
+            this.vatRate = Number(first.vatPerc / 100) || this.vatRate;
+          }
 
-        this.loadProductsAndStock();
-      });
+          this.loadProductsAndStock();
+        });
     } else {
       this.loadProductsAndStock();
     }
   }
 
-  // --- Loading ---
+  // ===== Loading =====
 
   private loadProductsAndStock() {
-    this.productSvc.getList({ skipCount: 0, maxResultCount: 1000 })
+    this.productSvc
+      .getList({ skipCount: 0, maxResultCount: 1000 })
       .subscribe(res => {
         this.products = res.items;
         this.filtered = this.products;
+        this.currentPage = 1;
         this.refreshStock();
       });
   }
@@ -118,45 +135,63 @@ export class Cart implements OnInit {
 
     this.loadingStock = true;
 
-    const productIds = this.products.map(p => p.id as any);
-    const branch = this.isAdmin ? (this.branchId as any) : null;
+    const allProductIds = this.products.map(p => p.id as string);
+    const branchId = this.isAdmin ? (this.branchId as string | undefined) : undefined;
 
-    this.stockSvc.getOnHandMap(productIds, branch).subscribe({
-      next: (map: Record<string, number>) => {
-        this.stockMap = this.toStringNumberMap(map);
+    // batch productIds to avoid huge URLs
+    const BATCH_SIZE = 50;
+    const batches: string[][] = [];
+    for (let i = 0; i < allProductIds.length; i += BATCH_SIZE) {
+      batches.push(allProductIds.slice(i, i + BATCH_SIZE));
+    }
+
+    const svcAny = this.stockSvc as any;
+    const hasMap = typeof svcAny.getOnHandMap === 'function';
+    const hasList = typeof svcAny.getOnHandList === 'function';
+
+    if (!hasMap && !hasList) {
+      // nothing to call, fall back to product DTO fields
+      this.fallbackFromProductDto();
+      return;
+    }
+
+    const calls = batches.map(ids =>
+      hasMap
+        ? svcAny.getOnHandMap(ids, branchId ?? null)
+        : svcAny.getOnHandList(ids, branchId ?? null),
+    );
+
+    forkJoin(calls).subscribe({
+      next: (results: any[]) => {
+        const combined: Record<string, number> = {};
+
+        if (hasMap) {
+          // each result is a productId -> onHand map
+          for (const res of results) {
+            const partial = this.toStringNumberMap(res);
+            Object.keys(partial).forEach(k => {
+              combined[k] = (combined[k] || 0) + partial[k];
+            });
+          }
+        } else {
+          // each result is a list [{ productId, onHand }, ...] or { items: [...] }
+          for (const res of results) {
+            const list = Array.isArray(res) ? res : res?.items ?? [];
+            for (const x of list) {
+              const key = String(x.productId);
+              const val = Number(x.onHand) || 0;
+              combined[key] = (combined[key] || 0) + val;
+            }
+          }
+        }
+
+        this.stockMap = combined;
         this.postStockRefresh();
       },
-      error: _ => this.tryListVersion(branch, productIds)
+      error: () => {
+        this.fallbackFromProductDto();
+      },
     });
-  }
-
-  // Base URL of your API (ABP environments usually expose this)
-  apiBase = ((environment as any)?.apis?.default?.url || '').replace(/\/+$/, '');
-
-  /** Build a usable image URL for a product */
-  imgSrc(p: ProductDto): string | null {
-    const raw = (p as any)?.imageUrl as string | undefined;
-    if (!raw) return null;
-    if (/^https?:\/\//i.test(raw)) return raw;              // already absolute
-    const path = raw.replace(/^\/+/, '');                   // strip leading slashes
-    return this.apiBase ? `${this.apiBase}/${path}` : `/${path}`;
-  }
-
-  private tryListVersion(branch: any, productIds: any[]) {
-    if ((this.stockSvc as any).getOnHandList) {
-      (this.stockSvc as any).getOnHandList(branch, productIds).subscribe({
-        next: (items: Array<{ productId: string; onHand: number }> | any) => {
-          const list = Array.isArray(items) ? items : (items?.items ?? []);
-          const map: Record<string, number> = {};
-          list.forEach((x: any) => (map[String(x.productId)] = Number(x.onHand) || 0));
-          this.stockMap = map;
-          this.postStockRefresh();
-        },
-        error: _ => this.fallbackFromProductDto()
-      });
-    } else {
-      this.fallbackFromProductDto();
-    }
   }
 
   private fallbackFromProductDto() {
@@ -178,7 +213,7 @@ export class Cart implements OnInit {
     if (!src) return out;
     for (const k in src) {
       if (Object.prototype.hasOwnProperty.call(src, k)) {
-        out[String(k)] = Number((src as any)[k]) || 0;
+        out[String(k)] = Number(src[k]) || 0;
       }
     }
     return out;
@@ -189,12 +224,23 @@ export class Cart implements OnInit {
     this.filter();
     this.lines.forEach(l => {
       const maxQty = this.onHand(l.product);
-      if (l.quantity > maxQty) l.quantity = Math.max(0, maxQty);
+      if (l.quantity > maxQty) {
+        l.quantity = Math.max(0, maxQty);
+      }
+      this.clampDiscountToCost(l);
     });
     this.lines = this.lines.filter(l => l.quantity > 0);
   }
 
-  // --- Helpers ---
+  // ===== Helpers =====
+
+  imgSrc(p: ProductDto): string | null {
+    const raw = (p as any)?.imageUrl as string | undefined;
+    if (!raw) return null;
+    if (/^https?:\/\//i.test(raw)) return raw;
+    const path = raw.replace(/^\/+/, '');
+    return this.apiBase ? `${this.apiBase}/${path}` : `/${path}`;
+  }
 
   onHand(p: ProductDto): number {
     return this.stockMap[String(p.id)] ?? 0;
@@ -214,7 +260,7 @@ export class Cart implements OnInit {
 
   trackByLine = (_: number, l: CartLine) => l.product.id;
 
-  // --- Filtering ---
+  // ===== Filtering + pagination =====
 
   filter() {
     const q = this.search.trim().toLowerCase();
@@ -224,7 +270,7 @@ export class Cart implements OnInit {
       : this.products.filter(p =>
           (p.productName || '').toLowerCase().includes(q) ||
           (p.productNo || '').toLowerCase().includes(q) ||
-          (p.productTypeName || '').toLowerCase().includes(q)
+          (p.productTypeName || '').toLowerCase().includes(q),
         );
 
     if (this.showInStockOnly) {
@@ -232,9 +278,101 @@ export class Cart implements OnInit {
     }
 
     this.filtered = base;
+    this.currentPage = 1;
   }
 
-  // --- Cart ops (stock-aware) ---
+  get totalPages(): number {
+    return this.filtered.length
+      ? Math.ceil(this.filtered.length / this.pageSize)
+      : 1;
+  }
+
+  get pagedProducts(): ProductDto[] {
+    const start = (this.currentPage - 1) * this.pageSize;
+    return this.filtered.slice(start, start + this.pageSize);
+  }
+
+  get pageStart(): number {
+    if (!this.filtered.length) return 0;
+    return (this.currentPage - 1) * this.pageSize + 1;
+  }
+
+  get pageEnd(): number {
+    if (!this.filtered.length) return 0;
+    return Math.min(this.currentPage * this.pageSize, this.filtered.length);
+  }
+
+  setPageSize(size: number) {
+    this.pageSize = size;
+    this.currentPage = 1;
+  }
+
+  goToPage(page: number) {
+    const total = this.totalPages;
+    if (page < 1) page = 1;
+    if (page > total) page = total;
+    this.currentPage = page;
+  }
+
+  nextPage() {
+    if (this.currentPage < this.totalPages) {
+      this.currentPage++;
+    }
+  }
+
+  prevPage() {
+    if (this.currentPage > 1) {
+      this.currentPage--;
+    }
+  }
+
+  // ===== Discount / price guards =====
+
+  /** Minimum allowed unit price = purchasing price (buyingUnitPrice) if available */
+  private minUnitPrice(p: ProductDto): number {
+    const purchase = Number((p as any).buyingUnitPrice ?? 0);
+    if (!Number.isFinite(purchase) || purchase <= 0) {
+      return 0;
+    }
+    return purchase;
+  }
+
+  /** Clamp discount so that selling price never goes below purchase price and never below zero line total */
+  private getClampedDiscount(l: CartLine, candidate: number): number {
+    const qty = Number(l.quantity) || 0;
+    const unitPrice = Number(l.unitPrice) || 0;
+    const minPrice = this.minUnitPrice(l.product);
+
+    if (qty <= 0 || unitPrice <= 0) {
+      return 0;
+    }
+
+    // Max discount to keep line >= qty * minPrice
+    const maxDiscountByCost = Math.max(0, qty * (unitPrice - minPrice));
+
+    // Max discount to keep line >= 0 (safety)
+    const maxDiscountByZero = qty * unitPrice;
+
+    let maxDiscount = maxDiscountByCost || maxDiscountByZero;
+    if (maxDiscount < 0) maxDiscount = 0;
+
+    let v = Number(candidate);
+    if (!Number.isFinite(v) || v < 0) v = 0;
+
+    if (v > maxDiscount) v = maxDiscount;
+    if (v < 0) v = 0;
+
+    return +v.toFixed(2);
+  }
+
+  private clampDiscountToCost(l: CartLine) {
+    l.discountAmount = this.getClampedDiscount(
+      l,
+      Number(l.discountAmount) || 0,
+    );
+  }
+
+  // ===== Cart ops (stock-aware) =====
 
   addToCart(p: ProductDto) {
     const inStock = this.onHand(p);
@@ -245,20 +383,21 @@ export class Cart implements OnInit {
       const next = Math.min(Number(line.quantity || 0) + 1, inStock);
       if (next !== line.quantity) {
         line.quantity = next;
+        this.clampDiscountToCost(line);
         this.lines = [...this.lines];
       }
       return;
     }
 
-    this.lines = [
-      ...this.lines,
-      {
-        product: p,
-        quantity: 1,
-        unitPrice: p.sellingUnitPrice ?? 0,
-        discountAmount: 0
-      }
-    ];
+    const l: CartLine = {
+      product: p,
+      quantity: 1,
+      unitPrice: p.sellingUnitPrice ?? 0,
+      discountAmount: 0,
+    };
+    this.clampDiscountToCost(l);
+
+    this.lines = [...this.lines, l];
   }
 
   inc(l: CartLine) {
@@ -266,6 +405,7 @@ export class Cart implements OnInit {
     const q = Number(l.quantity || 0);
     if (q < maxQty) {
       l.quantity = q + 1;
+      this.clampDiscountToCost(l);
       this.lines = [...this.lines];
     }
   }
@@ -274,6 +414,7 @@ export class Cart implements OnInit {
     const q = Number(l.quantity || 0);
     if (q > 1) {
       l.quantity = q - 1;
+      this.clampDiscountToCost(l);
       this.lines = [...this.lines];
     } else {
       this.remove(l);
@@ -285,12 +426,23 @@ export class Cart implements OnInit {
     l.quantity = Number(l.quantity);
     if (!Number.isFinite(l.quantity) || l.quantity < 1) l.quantity = 1;
     if (l.quantity > maxQty) l.quantity = Math.max(0, maxQty);
-    if (l.quantity === 0) this.remove(l);
-    else this.lines = [...this.lines];
+    if (l.quantity === 0) {
+      this.remove(l);
+      return;
+    }
+    this.clampDiscountToCost(l);
+    this.lines = [...this.lines];
   }
 
-  discountChanged(l: CartLine, val: any) {
-    l.discountAmount = Math.max(0, Number(val) || 0);
+  discountChanged(l: CartLine, raw: any, inputEl: HTMLInputElement) {
+    const clamped = this.getClampedDiscount(l, Number(raw) || 0);
+    l.discountAmount = clamped;
+
+    // force DOM input to stay at clamped value
+    if (inputEl) {
+      inputEl.value = clamped ? clamped.toString() : '';
+    }
+
     this.lines = [...this.lines];
   }
 
@@ -302,24 +454,27 @@ export class Cart implements OnInit {
     this.lines = this.lines.filter(x => x !== l);
   }
 
-  clear() { this.lines = []; }
+  clear() {
+    this.lines = [];
+  }
 
-  // --- Totals & checkout ---
+  // ===== Totals & checkout =====
 
   get totals() {
-    const ex = this.lines.reduce(
-      (a, l) =>
-        a +
-        Math.max(
-          0,
-          Number(l.quantity) * Number(l.unitPrice) -
-            Number(l.discountAmount || 0)
-        ),
-      0
-    );
+    const ex = this.lines.reduce((a, l) => {
+      const lineGross = Number(l.quantity) * Number(l.unitPrice);
+      const disc = Number(l.discountAmount || 0);
+      const net = Math.max(0, lineGross - disc);
+      return a + net;
+    }, 0);
+
     const vat = ex * this.vatRate;
     const inc = ex + vat;
-    return { ex: +ex.toFixed(2), vat: +vat.toFixed(2), inc: +inc.toFixed(2) };
+    return {
+      ex: +ex.toFixed(2),
+      vat: +vat.toFixed(2),
+      inc: +inc.toFixed(2),
+    };
   }
 
   private validateAgainstStock(): string[] {
@@ -328,7 +483,7 @@ export class Cart implements OnInit {
       const available = this.onHand(l.product);
       if (l.quantity > available) {
         errors.push(
-          `${l.product.productName} (wanted ${l.quantity}, available ${available})`
+          `${l.product.productName} (wanted ${l.quantity}, available ${available})`,
         );
       }
     }
@@ -337,6 +492,9 @@ export class Cart implements OnInit {
 
   checkout() {
     if (!this.lines.length) return;
+
+    // final safety clamp
+    this.lines.forEach(l => this.clampDiscountToCost(l));
 
     const over = this.validateAgainstStock();
     if (over.length) {
@@ -347,18 +505,16 @@ export class Cart implements OnInit {
     const header: CreateUpdateStockMovementHeaderDto = {
       stockMovementNo: '',
       stockMovementType: StockMovementType.Sale,
-      businessPartnerName: '',
+      businessPartnerName: this.customerName.trim() || '',
       description: 'POS Sale',
       amountExclVat: this.totals.ex,
       amountVat: this.totals.vat,
       amountInclVat: this.totals.inc,
       ...(this.isAdmin && this.branchId ? { branchId: this.branchId as any } : {}),
       details: this.lines.map<CreateUpdateStockMovementDetailDto>(l => {
-        const ex = Math.max(
-          0,
-          Number(l.quantity) * Number(l.unitPrice) -
-            Number(l.discountAmount || 0)
-        );
+        const lineGross = Number(l.quantity) * Number(l.unitPrice);
+        const disc = Number(l.discountAmount || 0);
+        const ex = Math.max(0, lineGross - disc);
         return {
           productId: l.product.id as any,
           uoM: l.product.uoM,
@@ -367,10 +523,10 @@ export class Cart implements OnInit {
           discountAmount: l.discountAmount,
           amountExclVat: +ex.toFixed(2),
           amountVat: +(ex * this.vatRate).toFixed(2),
-          amountInclVat: +(ex * (1 + this.vatRate)).toFixed(2)
+          amountInclVat: +(ex * (1 + this.vatRate)).toFixed(2),
         };
       }),
-      isCancelled: false
+      isCancelled: false,
     };
 
     // UoM enum normalization (if backend expects number)

@@ -3,7 +3,7 @@ import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { ConfigStateService, CurrentUserDto } from '@abp/ng.core';
-
+import { NzSelectModule } from 'ng-zorro-antd/select';
 import { BranchDto, BranchService } from 'src/app/proxy/branches';
 import { ProductDto, ProductService, UoMEnum } from 'src/app/proxy/products';
 import {
@@ -17,7 +17,7 @@ import { environment } from 'src/environments/environment';
 @Component({
   selector: 'app-inventory-add',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, NzSelectModule],
   templateUrl: './inventory-add.html',
   styleUrl: './inventory-add.scss',
 })
