@@ -32,6 +32,7 @@
     "@angular/platform-browser-dynamic": "~20.0.0",
     "@angular/router": "~20.0.0",
     "@angular/cdk": "~20.0.0",
+    "@swimlane/ngx-datatable": "^22.0.0",
     "chart.js": "^4.5.1",
     "ng-zorro-antd": "^20.4.3",
     "ng2-charts": "^7.0.0",
