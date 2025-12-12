@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using POS.Permissions;
+using POS.Products;
 using POS.StockMovement;
 using System;
 using System.Collections.Generic;
@@ -23,13 +24,16 @@ namespace POS.StockMovements
         IStockMovementAppService
     {
         private readonly IRepository<StockMovementDetail, Guid> _detailRepo;
+        private readonly IRepository<Product, Guid> _productRepo;
 
         public StockMovementAppService(
             IRepository<StockMovementHeader, Guid> headerRepo,
-            IRepository<StockMovementDetail, Guid> detailRepo)
+            IRepository<StockMovementDetail, Guid> detailRepo,
+            IRepository<Product, Guid> productRepo)
             : base(headerRepo)
         {
             _detailRepo = detailRepo;
+            _productRepo = productRepo;
 
             GetPolicyName = POSPermissions.StockMovements.Default;
             GetListPolicyName = POSPermissions.StockMovements.Default;
@@ -264,121 +268,302 @@ namespace POS.StockMovements
             var isAdmin = await IsAdminAsync();
             var effectiveBranchId = isAdmin ? input.BranchId : await RequireUserBranchAsync();
 
-            var q = (await Repository.GetQueryableAsync());
+            var details = await _detailRepo.GetQueryableAsync();
 
-            if (!input.IncludeCancelled)
-                q = q.Where(h => !h.IsCancelled);
-
-            if (effectiveBranchId.HasValue && effectiveBranchId.Value != Guid.Empty)
-                q = q.Where(h => h.BranchId == effectiveBranchId.Value);
-
-            if (input.DateFrom.HasValue)
-                q = q.Where(h => h.CreationTime >= input.DateFrom.Value);
-
-            if (input.DateTo.HasValue)
-                q = q.Where(h => h.CreationTime <= input.DateTo.Value);
-
-            if (input.ProductId.HasValue && input.ProductId.Value != Guid.Empty)
-                q = q.Where(h => h.StockMovementDetails.Any(d => d.ProductId == input.ProductId.Value));
-
-            if (input.ProductTypeId.HasValue && input.ProductTypeId.Value != Guid.Empty)
-                q = q.Where(h => h.StockMovementDetails.Any(d => d.Product.ProductTypeId == input.ProductTypeId.Value));
-
-            if (input.StockMovementType.HasValue)
-                q = q.Where(h => h.StockMovementType == input.StockMovementType.Value);
-
-            q.Include(x => x.Creator);
-
-            var flat = from h in q
-                       from d in h.StockMovementDetails
-                       select new ProductMovementDto
-                       {
-                           Id = d.Id,
-                           HeaderId = h.Id,
-                           StockMovementNo = h.StockMovementNo,
-                           MovementDate = h.CreationTime,
-                           CreatedByUserId = h.CreatorId,
-                           CreatedBy = h.Creator == null ? "" : h.Creator.Name,
-                           BranchId = h.BranchId,
-                           BranchName = h.Branch.Name,
-                           StockMovementType = h.StockMovementType,
-                           ProductId = d.ProductId,
-                           ProductName = d.Product.ProductName,
-                           ProductType = d.Product.ProductType.Type,
-                           QuantitySigned =
-                               (h.StockMovementType == StockMovementType.Purchase ||
-                                h.StockMovementType == StockMovementType.AdjustmentPlus)
-                                   ? d.Quantity
-                                   : -d.Quantity,
-                           UnitPrice = d.UnitPrice,
-                           AmountExclVat = d.AmountExclVat,
-                           AmountVat = d.AmountVat,
-                           AmountInclVat = d.AmountInclVat,
-                           Description = h.Description
-                       };
+            var q = details
+                .WhereIf(!input.IncludeCancelled, d => !d.StockMovementHeader.IsCancelled)
+                .WhereIf(effectiveBranchId.HasValue && effectiveBranchId.Value != Guid.Empty,
+                    d => d.StockMovementHeader.BranchId == effectiveBranchId.Value)
+                .WhereIf(input.DateFrom.HasValue,
+                    d => d.StockMovementHeader.CreationTime >= input.DateFrom.Value)
+                .WhereIf(input.DateTo.HasValue,
+                    d => d.StockMovementHeader.CreationTime <= input.DateTo.Value)
+                .WhereIf(input.StockMovementType.HasValue,
+                    d => d.StockMovementHeader.StockMovementType == input.StockMovementType.Value)
+                .WhereIf(input.ProductId.HasValue && input.ProductId.Value != Guid.Empty,
+                    d => d.ProductId == input.ProductId.Value)
+                .WhereIf(input.ProductTypeId.HasValue && input.ProductTypeId.Value != Guid.Empty,
+                    d => d.Product.ProductTypeId == input.ProductTypeId.Value)
+                .Select(d => new ProductMovementDto
+                {
+                    Id = d.Id,
+                    HeaderId = d.StockMovementHeaderId,
+                    StockMovementNo = d.StockMovementHeader.StockMovementNo,
+                    MovementDate = d.StockMovementHeader.CreationTime,
+                    CreatedByUserId = d.StockMovementHeader.CreatorId,
+                    CreatedBy = d.StockMovementHeader.Creator == null ? "" : d.StockMovementHeader.Creator.Name,
+                    BranchId = d.StockMovementHeader.BranchId,
+                    BranchName = d.StockMovementHeader.Branch.Name,
+                    StockMovementType = d.StockMovementHeader.StockMovementType,
+                    ProductId = d.ProductId,
+                    ProductName = d.Product.ProductName,
+                    ProductType = d.Product.ProductType.Type,
+                    QuantitySigned =
+                        (d.StockMovementHeader.StockMovementType == StockMovementType.Purchase ||
+                         d.StockMovementHeader.StockMovementType == StockMovementType.AdjustmentPlus)
+                            ? d.Quantity
+                            : -d.Quantity,
+                    UnitPrice = d.UnitPrice,
+                    AmountExclVat = d.AmountExclVat,
+                    AmountVat = d.AmountVat,
+                    AmountInclVat = d.AmountInclVat,
+                    Description = d.StockMovementHeader.Description
+                });
 
             var sorting = string.IsNullOrWhiteSpace(input.Sorting)
                 ? "MovementDate DESC, StockMovementNo DESC"
                 : input.Sorting;
 
-            var sorted = flat.OrderBy(sorting);
+            q = q.OrderBy(sorting);
 
-            var totalCount = await AsyncExecuter.CountAsync(sorted);
-            var items = await AsyncExecuter.ToListAsync(
-                sorted.Skip(input.SkipCount).Take(input.MaxResultCount > 0 ? input.MaxResultCount : 50)
-            );
+            var totalCount = await AsyncExecuter.CountAsync(q);
+            var take = input.MaxResultCount > 0 ? input.MaxResultCount : 50;
 
+            var items = await AsyncExecuter.ToListAsync(q.Skip(input.SkipCount).Take(take));
             return new PagedResultDto<ProductMovementDto>(totalCount, items);
         }
 
         [Authorize(POSPermissions.StockMovements.Default)]
-        public virtual async Task<List<StockReportDto>> GetStockReportAsync(Guid? branchId = null, Guid? productId = null)
+        public virtual async Task<PagedResultDto<StockReportDto>> GetStockReportAsync(ProductStockListRequestDto input)
         {
             var isAdmin = await IsAdminAsync();
-            if (!isAdmin)
-                branchId = await RequireUserBranchAsync();
+            var effectiveBranchId = isAdmin ? input.BranchId : await RequireUserBranchAsync();
 
-            var baseQuery = (await Repository.GetQueryableAsync())
-                .Where(h => !h.IsCancelled);
+            // Headers (base)
+            var headers = (await Repository.GetQueryableAsync())
+                .AsNoTracking()
+                .Where(h => !h.IsCancelled)
+                .WhereIf(effectiveBranchId.HasValue && effectiveBranchId.Value != Guid.Empty,
+                    h => h.BranchId == effectiveBranchId!.Value);
 
-            if (branchId.HasValue && branchId.Value != Guid.Empty)
-                baseQuery = baseQuery.Where(h => h.BranchId == branchId.Value);
+            // Flatten Header -> Details, project only what we need
+            var flat = headers.SelectMany(h => h.StockMovementDetails.Select(d => new
+            {
+                // Branch
+                h.BranchId,
+                BranchName = h.Branch.Name,
 
-            if (productId.HasValue && productId.Value != Guid.Empty)
-                baseQuery = baseQuery.Where(h => h.StockMovementDetails.Any(d => d.ProductId == productId.Value));
+                // Product
+                d.ProductId,
+                ProductNo = d.Product.ProductNo,
+                ProductTitle = d.Product.ProductName,
+                ImageUrl = d.Product.ImageUrl,
 
-            var q = from h in baseQuery
-                    from d in h.StockMovementDetails
-                    select new
-                    {
-                        h.BranchId,
-                        BranchName = h.Branch.Name,
-                        d.ProductId,
-                        ProductName = d.Product.ProductNo + " " + d.Product.ProductName,
-                        ProductTypeId = d.Product.ProductTypeId,
-                        ProductType = d.Product.ProductType.TypeDesc,
-                        SignedQty =
-                            (h.StockMovementType == StockMovementType.Purchase ||
-                             h.StockMovementType == StockMovementType.AdjustmentPlus)
-                                ? d.Quantity
-                                : -d.Quantity
-                    };
+                // IMPORTANT: keep your existing DTO property type/name (UoM or UoMEnum)
+                UoM = d.Product.UoM,
 
-            var grouped = await AsyncExecuter.ToListAsync(
-                q.GroupBy(x => new { x.BranchId, x.BranchName, x.ProductId, x.ProductName })
-                 .Select(g => new StockReportDto
-                 {
-                     BranchId = g.Key.BranchId,
-                     BranchName = g.Key.BranchName,
-                     ProductId = g.Key.ProductId,
-                     ProductName = g.Key.ProductName,
-                     ProductTypeId = g.First().ProductTypeId,
-                     ProductType = g.First().ProductType ?? "",
-                     OnHand = g.Sum(x => x.SignedQty)
-                 })
+                BuyingUnitPrice = d.Product.BuyingUnitPrice,
+                SellingUnitPrice = d.Product.SellingUnitPrice,
+
+                // Type
+                ProductTypeId = d.Product.ProductTypeId,
+                ProductType = d.Product.ProductType != null ? d.Product.ProductType.Type : null,
+
+                // Movement
+                MovementDate = h.CreationTime,
+
+                SignedQty =
+                    (h.StockMovementType == StockMovementType.Purchase ||
+                     h.StockMovementType == StockMovementType.AdjustmentPlus)
+                        ? d.Quantity
+                        : -d.Quantity
+            }));
+
+            // Detail-level filters (more efficient than header.Any(...))
+            flat = flat
+                .WhereIf(input.ProductId.HasValue && input.ProductId.Value != Guid.Empty,
+                    x => x.ProductId == input.ProductId!.Value)
+                .WhereIf(input.ProductTypeId.HasValue && input.ProductTypeId.Value != Guid.Empty,
+                    x => x.ProductTypeId == input.ProductTypeId!.Value);
+
+            // Text filter (SQL translatable)
+            if (!string.IsNullOrWhiteSpace(input.Filter))
+            {
+                var f = input.Filter.Trim();
+                var pattern = $"%{f}%";
+
+                flat = flat.Where(x =>
+                    (!string.IsNullOrEmpty(x.ProductNo) && EF.Functions.Like(x.ProductNo!, pattern)) ||
+                    (!string.IsNullOrEmpty(x.ProductTitle) && EF.Functions.Like(x.ProductTitle!, pattern)));
+            }
+
+            // Group and aggregate
+            var groupedQuery =
+                flat.GroupBy(x => new
+                {
+                    x.BranchId,
+                    x.BranchName,
+
+                    x.ProductId,
+                    x.ProductNo,
+                    x.ProductTitle,
+
+                    x.ImageUrl,
+                    x.UoM,
+                    x.BuyingUnitPrice,
+                    x.SellingUnitPrice,
+
+                    x.ProductTypeId,
+                    x.ProductType
+                })
+                .Select(g => new StockReportDto
+                {
+                    BranchId = g.Key.BranchId,
+                    BranchName = g.Key.BranchName,
+
+                    ProductId = g.Key.ProductId,
+                    ProductName = (g.Key.ProductNo ?? "") + " " + (g.Key.ProductTitle ?? ""),
+                    ImageUrl = g.Key.ImageUrl ?? "",
+
+                    ProductTypeId = g.Key.ProductTypeId,
+                    ProductType = g.Key.ProductType ?? "",
+
+                    UoM = g.Key.UoM,
+                    BuyingUnitPrice = g.Key.BuyingUnitPrice,
+                    SellingUnitPrice = g.Key.SellingUnitPrice,
+
+                    OnHand = g.Sum(x => x.SignedQty),
+                    LastUpdated = g.Max(x => x.MovementDate)
+                });
+
+            if (input.OnlyAvailable)
+                groupedQuery = groupedQuery.Where(x => x.OnHand > 0);
+
+            var totalCount = await AsyncExecuter.LongCountAsync(groupedQuery);
+
+            // ABP sorting pattern (no custom sorting parser)
+            IQueryable<StockReportDto> ordered =
+                string.IsNullOrWhiteSpace(input.Sorting)
+                    ? groupedQuery
+                        .OrderByDescending(x => x.OnHand)
+                        .ThenBy(x => x.ProductName)
+                        .ThenBy(x => x.ProductId)
+                    : groupedQuery.OrderBy(input.Sorting);
+
+            var take = input.MaxResultCount > 0 ? input.MaxResultCount : 50;
+
+            var items = await AsyncExecuter.ToListAsync(
+                ordered.PageBy(input.SkipCount, take)
             );
 
-            return grouped.OrderBy(x => x.BranchName).ThenBy(x => x.ProductName).ToList();
+            return new PagedResultDto<StockReportDto>(totalCount, items);
+        }
+
+        [Authorize(POSPermissions.StockMovements.Default)]
+        public virtual async Task<PagedResultDto<ProductStockListItemDto>> GetProductStockListAsync(ProductStockListRequestDto input)
+        {
+            var isAdmin = await IsAdminAsync();
+            var effectiveBranchId = isAdmin ? input.BranchId : await RequireUserBranchAsync();
+
+            if (isAdmin && (!effectiveBranchId.HasValue || effectiveBranchId.Value == Guid.Empty))
+                throw new BusinessException("BranchRequiredForAdmin");
+
+            // -------------------------
+            // 1) Stock aggregation query
+            // -------------------------
+            var headersQ = (await Repository.GetQueryableAsync())
+                .AsNoTracking()
+                .Where(h => !h.IsCancelled);
+
+            if (effectiveBranchId.HasValue && effectiveBranchId.Value != Guid.Empty)
+                headersQ = headersQ.Where(h => h.BranchId == effectiveBranchId.Value);
+
+            var detailsQ = (await _detailRepo.GetQueryableAsync()).AsNoTracking();
+
+            var stockAgg = await (
+                from d in detailsQ
+                join h in headersQ on d.StockMovementHeaderId equals h.Id
+                group new { h, d } by d.ProductId into g
+                select new
+                {
+                    ProductId = g.Key,
+                    OnHand = g.Sum(x =>
+                        (x.h.StockMovementType == StockMovementType.Purchase ||
+                         x.h.StockMovementType == StockMovementType.AdjustmentPlus)
+                            ? (decimal)x.d.Quantity
+                            : -(decimal)x.d.Quantity)
+                }
+            ).ToListAsync();
+
+            var stockMap = stockAgg
+                .GroupBy(x => x.ProductId)
+                .ToDictionary(g => g.Key, g => g.Sum(x => x.OnHand));
+
+            // -------------------------
+            // 2) Products query (filters)
+            // -------------------------
+            var productsQ = (await _productRepo.GetQueryableAsync()).AsNoTracking();
+
+            if (!string.IsNullOrWhiteSpace(input.Filter))
+            {
+                var f = input.Filter.Trim().ToLower();
+
+                productsQ = productsQ.Where(p =>
+                    (p.ProductNo != null && p.ProductNo.ToLower().Contains(f)) ||
+                    (p.ProductName != null && p.ProductName.ToLower().Contains(f)));
+            }
+
+            if (input.ProductId.HasValue && input.ProductId.Value != Guid.Empty)
+                productsQ = productsQ.Where(p => p.Id == input.ProductId.Value);
+
+            if (input.ProductTypeId.HasValue && input.ProductTypeId.Value != Guid.Empty)
+                productsQ = productsQ.Where(p => p.ProductTypeId == input.ProductTypeId.Value);
+
+            var products = await productsQ
+                .Select(p => new
+                {
+                    p.Id,
+                    p.ProductNo,
+                    p.ProductName,
+                    p.ProductTypeId,
+                    ProductType = p.ProductType != null ? (p.ProductType.TypeDesc ?? "") : "",
+                    p.ImageUrl,
+                    p.UoM,
+                    p.BuyingUnitPrice,
+                    p.SellingUnitPrice
+                })
+                .ToListAsync();
+
+            // -------------------------
+            // 3) Join + filter + sort + page (in-memory)
+            // -------------------------
+            var all = products.Select(p =>
+            {
+                stockMap.TryGetValue(p.Id, out var onHand);
+
+                return new ProductStockListItemDto
+                {
+                    Id = p.Id,
+                    ProductNo = p.ProductNo ?? "",
+                    ProductId = p.Id, // if you keep this property in DTO; otherwise remove it from DTO
+                    ProductName = p.ProductName ?? "",
+                    ProductTypeId = p.ProductTypeId,
+                    ProductType = p.ProductType ?? "",
+                    UoM = p.UoM,
+                    BuyingUnitPrice = p.BuyingUnitPrice,
+                    SellingUnitPrice = p.SellingUnitPrice,
+                    ImageUrl = p.ImageUrl,
+                    OnHand = onHand
+                };
+            });
+
+            if (input.OnlyAvailable)
+                all = all.Where(x => x.OnHand > 0);
+
+            all = all
+                .OrderByDescending(x => x.OnHand)
+                .ThenBy(x => x.ProductName)
+                .ThenBy(x => x.Id);
+
+            var totalCount = all.Count();
+
+            var take = input.MaxResultCount > 0 ? input.MaxResultCount : 50;
+            var items = all
+                .Skip(input.SkipCount)
+                .Take(take)
+                .ToList();
+
+            return new PagedResultDto<ProductStockListItemDto>(totalCount, items);
         }
 
         [Authorize(POSPermissions.StockMovements.Default)]

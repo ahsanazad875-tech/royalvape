@@ -1,188 +1,51 @@
-/* ============== Card + Header ============== */
-
-.sm-card {
-  background: #fff;
-  border: 1px solid var(--neutral-150);
-  border-radius: 12px;
-  padding: 1.25rem 1.5rem;
-  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05);
-
-  /* IMPORTANT FIXES */
+.stock-report-card,
+.stock-report-body {
   width: 100%;
   max-width: 100%;
-  box-sizing: border-box;
-  overflow-x: hidden;
-
-  * {
-    box-sizing: border-box;
-    min-width: 0;
-    max-width: 100%;
-  }
 }
 
-.sm-header {
+.stock-report-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.stock-report-subtitle {
+  font-size: 0.85rem;
+  color: var(--neutral-500);
+}
+
+.stock-report-filters__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1rem;
-
-  .sm-title {
-    margin: 0;
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--neutral-900);
-  }
-
-  .sm-subtitle {
-    margin: 0.15rem 0 0;
-    font-size: 0.8rem;
-    color: var(--neutral-500);
-  }
-
-  .sm-summary {
-    color: var(--neutral-600);
-    font-size: 0.8rem;
-    white-space: nowrap;
-  }
+  cursor: pointer;
+  user-select: none;
 }
 
-/* ============== Collapsible Filter Card ============== */
-
-.filter-card {
-  border: 1px solid var(--neutral-150);
-  border-radius: 10px;
-  margin-bottom: 1rem;
-  background: var(--neutral-25);
-
-  .filter-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.6rem 0.9rem;
-    cursor: pointer;
-    background: var(--neutral-100);
-    border-bottom: 1px solid var(--neutral-150);
-    border-radius: 10px 10px 0 0;
-
-    h3 {
-      margin: 0;
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: var(--neutral-800);
-    }
-
-    .toggle {
-      font-size: 0.8rem;
-      color: var(--primary-blue);
-    }
-  }
-
-  .filter-card-body {
-    padding: 0.9rem 1rem;
-    background: #fff;
-    border-radius: 0 0 10px 10px;
-  }
+.stock-report-filters__toggle {
+  font-size: 0.85rem;
+  color: var(--primary-blue);
 }
 
-/* ============== Filter Grid ============== */
-
-.filter-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr)); /* FIXED */
-  gap: 0.75rem 0.9rem;
-  align-items: end;
-
-  .fg-item {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-
-    .form-label {
-      margin-bottom: 0;
-    }
-
-    .form-select,
-    .form-control {
-      width: 100%;
-    }
-  }
-
-  /* Action Buttons */
-  .fg-actions {
-    display: inline-flex;
-    flex-direction: row !important;
-    gap: 0.5rem;
-    justify-self: end;
-    align-self: end;
-  }
+.stock-report-onlyavailable {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
 }
 
-/* ============== Table ============== */
-
-.table-wrap {
-  margin-top: 0.5rem;
-  overflow-x: auto;
-  width: 100%;
+.stock-report-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
-.sm-table {
-  font-variant-numeric: tabular-nums;
-
-  tbody td {
-    white-space: nowrap;
-  }
-}
-
-/* ============== States ============== */
-
-.sm-state {
-  padding: 0.6rem 0.2rem;
-  font-size: 0.9rem;
-  color: var(--neutral-600);
-
-  &.sm-state-loading,
-  &.sm-state-empty {
-    font-style: italic;
-  }
-}
-
-/* ============== Responsive ============== */
-
-@media (max-width: 900px) {
-  .filter-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr)); /* FIXED */
-  }
-}
-
-@media (max-width: 720px) {
-  .sm-header {
-    flex-direction: column;
-    align-items: flex-start;
-
-    .sm-summary {
-      margin-top: 0.25rem;
-    }
-  }
-
-  .filter-grid .fg-actions {
-    grid-column: 1 / -1;
-    justify-content: flex-end;
-  }
-}
-
-@media (max-width: 480px) {
-  .filter-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .filter-grid .fg-actions {
-    grid-column: 1 / -1;
+@media (max-width: 576px) {
+  .stock-report-actions {
     justify-content: stretch;
+  }
 
-    .btn {
-      flex: 1 1 auto;
-      justify-content: center;
-    }
+  .stock-report-actions .btn {
+    flex: 1 1 auto;
   }
 }

@@ -1,11 +1,10 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using POS.Permissions;
-using POS.ProductTypes;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
+using System.Linq.Dynamic.Core;
 using System.Threading.Tasks;
 using Volo.Abp.Application.Dtos;
 using Volo.Abp.Application.Services;
@@ -47,28 +46,48 @@ namespace POS.Products
         {
             return await Repository.WithDetailsAsync(p => p.ProductType);
         }
-        public override async Task<PagedResultDto<ProductDto>> GetListAsync(PagedAndSortedResultRequestDto input)
+        public async Task<PagedResultDto<ProductDto>> GetProductListAsync(ProductListRequestDto input)
         {
             var query = await Repository.GetQueryableAsync();
 
-            var totalCount = query.Count();
+            query = query
+                .WhereIf(input.ProductId.HasValue && input.ProductId.Value != Guid.Empty,
+                    x => x.Id == input.ProductId.Value)
+                .WhereIf(input.ProductTypeId.HasValue && input.ProductTypeId.Value != Guid.Empty,
+                    x => x.ProductTypeId == input.ProductTypeId.Value);
 
-            var items = query
-                .Include(x => x.Creator)
-                .Include(x => x.LastModifier)
-                .Include(x => x.ProductType)
-                .Skip(input.SkipCount)
-                .Take(input.MaxResultCount)
-                .ToList();
+            if (!string.IsNullOrWhiteSpace(input.Filter))
+            {
+                var f = input.Filter.Trim().ToLower();
+                query = query.Where(x => x.ProductName.ToLower().Contains(f));
+            }
 
-            var productDtos = new List<ProductDto>();
+            var totalCount = await AsyncExecuter.CountAsync(query);
+
+            var sorting = string.IsNullOrWhiteSpace(input.Sorting)
+                ? $"{nameof(Product.ProductName)} ASC"
+                : input.Sorting;
+
+            var take = input.MaxResultCount > 0 ? input.MaxResultCount : 50;
+
+            var items = await AsyncExecuter.ToListAsync(
+                query
+                    .Include(x => x.Creator)
+                    .Include(x => x.LastModifier)
+                    .Include(x => x.ProductType)
+                    .OrderBy(sorting)
+                    .Skip(input.SkipCount)
+                    .Take(take)
+            );
+
+            var productDtos = new List<ProductDto>(items.Count);
 
             foreach (var item in items)
             {
                 var dto = ObjectMapper.Map<Product, ProductDto>(item);
 
-                dto.CreatorName = item.Creator != null ? item.Creator.UserName : null;
-                dto.ModifiedBy = item.LastModifier != null ? item.LastModifier.UserName : null;
+                dto.CreatorName = item.Creator?.UserName;
+                dto.ModifiedBy = item.LastModifier?.UserName;
                 dto.ProductTypeName = item.ProductType?.Type ?? "";
 
                 productDtos.Add(dto);

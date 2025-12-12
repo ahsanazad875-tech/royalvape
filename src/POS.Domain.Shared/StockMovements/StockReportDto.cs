@@ -1,8 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using POS.Products;
+using System;
 
 namespace POS.StockMovements
 {
@@ -14,6 +11,11 @@ namespace POS.StockMovements
         public string ProductName { get; set; } = default!;
         public Guid? ProductTypeId { get; set; }
         public string? ProductType { get; set; }
+        public UoMEnum UoM { get; set; }
+        public decimal BuyingUnitPrice { get; set; }
+        public decimal SellingUnitPrice { get; set; }
+        public string? ImageUrl { get; set; }
+        public DateTime LastUpdated { get; set; }
         public decimal OnHand { get; set; }
     }
     public class OnHandItemDto
