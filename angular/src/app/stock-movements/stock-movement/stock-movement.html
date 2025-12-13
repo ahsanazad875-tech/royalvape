@@ -1,225 +1,181 @@
-<div class="sm-card">
-  <div class="sm-header">
+<div class="card stock-movement-card">
+  <div class="card-header d-flex align-items-start justify-content-between gap-3">
     <div>
-      <h2 class="sm-title">Stock Movements</h2>
-      <p class="sm-subtitle">Royal Vapes – Sales &amp; Inventory</p>
+      <h2 class="mb-1">Stock Movements</h2>
+      <p class="mb-0 text-muted">Royal Vapes – Sales &amp; Inventory</p>
     </div>
 
-    <span class="sm-summary" *ngIf="totalCount() > 0">
-      Showing <b>{{ visibleFrom() }}</b>–<b>{{ visibleTo() }}</b> of
-      <b>{{ totalCount() }}</b> rows
-    </span>
+    <div class="text-muted small" *ngIf="totalCount() > 0">
+      Showing <b>{{ visibleFrom() }}</b>–<b>{{ visibleTo() }}</b> of <b>{{ totalCount() }}</b>
+    </div>
   </div>
 
-  <!-- Collapsible Filters -->
-  <div class="filter-card">
-    <div class="filter-card-header" (click)="filtersCollapsed = !filtersCollapsed">
-      <h3>Filters</h3>
-      <span class="toggle">{{ filtersCollapsed ? 'Show' : 'Hide' }}</span>
-    </div>
+  <div class="card-body">
+    <!-- Filters -->
+    <div class="card mb-3">
+      <div
+        class="card-header d-flex align-items-center justify-content-between stock-movement-filters-header"
+        role="button"
+        (click)="filtersCollapsed = !filtersCollapsed"
+      >
+        <span class="fw-semibold">Filters</span>
+        <span class="stock-movement-toggle">{{ filtersCollapsed ? 'Show' : 'Hide' }}</span>
+      </div>
 
-    <div class="filter-card-body" *ngIf="!filtersCollapsed">
-      <form [formGroup]="form" class="filter-grid" (ngSubmit)="search()">
+      <div class="card-body" *ngIf="!filtersCollapsed">
+        <form [formGroup]="form" (ngSubmit)="search()">
+          <div class="row g-3 align-items-end">
 
-        <div class="fg-item" *ngIf="currentUser.roles.includes('admin')">
-          <label class="form-label" for="branchId">Branch</label>
-          <select
-            id="branchId"
-            class="form-select form-select-sm"
-            formControlName="branchId"
-          >
-            <option value="">All</option>
-            <option *ngFor="let b of branches()" [value]="b.id">{{ b.name }}</option>
-          </select>
-        </div>
+            <!-- Branch -->
+            <div class="col-12 col-md-6 col-lg-2" *ngIf="isAdmin">
+              <label class="form-label">Branch</label>
+              <nz-select class="w-100" nzShowSearch nzAllowClear nzPlaceHolder="All" formControlName="branchId">
+                <nz-option nzValue="" nzLabel="All"></nz-option>
+                <nz-option *ngFor="let b of branches()" [nzValue]="b.id" [nzLabel]="b.name"></nz-option>
+              </nz-select>
+            </div>
 
-        <div class="fg-item">
-          <label class="form-label" for="productId">Product</label>
-          <select
-            id="productId"
-            class="form-select form-select-sm"
-            formControlName="productId"
-          >
-            <option value="">All</option>
-            <option *ngFor="let p of products()" [value]="p.id">
-              {{ p.productName }}
-            </option>
-          </select>
-        </div>
+            <!-- Product -->
+            <div class="col-12 col-md-6 col-lg-3">
+              <label class="form-label">Product</label>
+              <nz-select class="w-100" nzShowSearch nzAllowClear nzPlaceHolder="All" formControlName="productId">
+                <nz-option nzValue="" nzLabel="All"></nz-option>
+                <nz-option *ngFor="let p of products()" [nzValue]="p.id" [nzLabel]="p.productNo + ' ' + p.productName"></nz-option>
+              </nz-select>
+            </div>
 
-        <div class="fg-item">
-          <label class="form-label" for="productTypeId">Product Type</label>
-          <select
-            id="productTypeId"
-            class="form-select form-select-sm"
-            formControlName="productTypeId"
-          >
-            <option value="">All</option>
-            <option *ngFor="let t of productTypes()" [value]="t.id">
-              {{ t.type }}
-            </option>
-          </select>
-        </div>
+            <!-- Product Type -->
+            <div class="col-12 col-md-6 col-lg-2">
+              <label class="form-label">Product Type</label>
+              <nz-select class="w-100" nzShowSearch nzAllowClear nzPlaceHolder="All" formControlName="productTypeId">
+                <nz-option nzValue="" nzLabel="All"></nz-option>
+                <nz-option *ngFor="let t of productTypes()" [nzValue]="t.id" [nzLabel]="t.type"></nz-option>
+              </nz-select>
+            </div>
 
-        <div class="fg-item">
-          <label class="form-label" for="movementType">Movement Type</label>
-          <select
-            id="movementType"
-            class="form-select form-select-sm"
-            formControlName="stockMovementType"
-          >
-            <option value="">All</option>
-            <option *ngFor="let t of movementTypeOptions" [value]="t.value">
-              {{ t.label }}
-            </option>
-          </select>
-        </div>
+            <!-- Movement Type -->
+            <div class="col-12 col-md-6 col-lg-2">
+              <label class="form-label">Movement Type</label>
+              <nz-select class="w-100" nzAllowClear nzPlaceHolder="All" formControlName="stockMovementType">
+                <nz-option *ngFor="let t of movementTypeOptions" [nzValue]="t.value" [nzLabel]="t.label"></nz-option>
+              </nz-select>
+            </div>
 
-        <div class="fg-item">
-          <label class="form-label" for="fromDate">From</label>
-          <input
-            id="fromDate"
-            type="datetime-local"
-            class="form-control form-control-sm"
-            formControlName="dateFrom"
-          />
-        </div>
+            <!-- From -->
+            <div class="col-12 col-md-6 col-lg-2">
+              <label class="form-label" for="dateFrom">From</label>
+              <input id="dateFrom" type="datetime-local" class="form-control form-control-sm" formControlName="dateFrom" />
+            </div>
 
-        <div class="fg-item">
-          <label class="form-label" for="toDate">To</label>
-          <input
-            id="toDate"
-            type="datetime-local"
-            class="form-control form-control-sm"
-            formControlName="dateTo"
-          />
-        </div>
+            <!-- To -->
+            <div class="col-12 col-md-6 col-lg-2">
+              <label class="form-label" for="dateTo">To</label>
+              <input id="dateTo" type="datetime-local" class="form-control form-control-sm" formControlName="dateTo" />
+            </div>
+            
+            <!-- COLUMN SELECT -->
+            <div class="col-12 col-md-6 col-lg-3">
+              <label class="form-label">Show / Hide Columns</label>
 
-        <!-- Checkbox -->
-        <div class="fg-item fg-check">
-          <div class="form-check">
-            <input
-              type="checkbox"
-              class="form-check-input"
-              id="chkCancelled"
-              formControlName="includeCancelled"
-            />
-            <label class="form-check-label" for="chkCancelled">
-              Include cancelled
-            </label>
+              <button type="button" nz-button nz-dropdown nzType="default" nzTrigger="click"
+                [nzDropdownMenu]="columnsMenu" class="w-100 d-flex justify-content-between align-items-center">
+                <span>Columns ({{ visibleColumns.length }})</span>
+                <i nz-icon nzType="down"></i>
+              </button>
+
+              <nz-dropdown-menu #columnsMenu="nzDropdownMenu" [nzClickHide]="false">
+                <ul nz-menu nzSelectable="false" class="p-2 column-dropdown">
+                  <li nz-menu-item *ngFor="let col of columns" class="d-flex align-items-center gap-2">
+                    <input type="checkbox" class="form-check-input me-2" [checked]="col.visible"
+                      (click)="$event.stopPropagation()"
+                      (change)="toggleColumn(col.key, $any($event.target).checked)" />
+                    <span>{{ col.label }}</span>
+                  </li>
+                </ul>
+              </nz-dropdown-menu>
+            </div>
+
+            <!-- Include cancelled -->
+            <div class="col-12 col-md-6 col-lg-2">
+              <label class="form-label d-block">&nbsp;</label>
+              <label nz-checkbox formControlName="includeCancelled">Include cancelled</label>
+            </div>
+
+
+            <!-- Actions -->
+            <div class="col-12 col-lg-3 ms-lg-auto">
+              <div class="d-flex justify-content-end gap-2 flex-wrap">
+                <button type="button" class="btn btn-outline-secondary btn-sm" (click)="reset()" [disabled]="loading()">
+                  Reset
+                </button>
+                <button type="submit" class="btn btn-primary btn-sm" [disabled]="loading()">
+                  Search
+                </button>
+              </div>
+            </div>
+
           </div>
-        </div>
-
-        <!-- Buttons -->
-        <div class="fg-item fg-actions">
-          <button
-            type="submit"
-            class="btn btn-primary btn-sm"
-            [disabled]="loading()"
-          >
-            Search
-          </button>
-          <button
-            type="button"
-            class="btn btn-outline-secondary btn-sm"
-            (click)="reset()"
-            [disabled]="loading()"
-          >
-            Reset
-          </button>
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
-  </div>
-
-  <!-- States -->
-  <div *ngIf="loading()" class="sm-state sm-state-loading">Loading…</div>
-  <div *ngIf="!loading() && totalCount() === 0" class="sm-state sm-state-empty">
-    No stock movements found.
-  </div>
 
     <!-- Table -->
-  <div class="table-wrap table-responsive" *ngIf="!loading() && rows().length">
-    <table class="table table-sm table-sticky-header sm-table">
-      <thead>
-        <tr>
-          <th>Date</th>
-          <th>Movement No.</th>
-          <th>Branch</th>
-          <th>Product</th>
-          <th>Product Type</th>
-          <th>Movement Type</th>
-          <th class="text-end">Qty (±)</th>
-          <th class="text-end">Unit Price</th>
-          <th class="text-end">Amount Excl VAT</th>
-          <!-- <th class="text-end">Amount VAT</th>
-          <th class="text-end">Amount Incl VAT</th> -->
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let r of rows(); trackBy: trackRow">
-          <td>{{ r.movementDate | date: 'yyyy-MM-dd HH:mm' }}</td>
-          <td>{{ r.stockMovementNo }}</td>
-          <td>{{ r.branchName }}</td>
-          <td>{{ r.productName }}</td>
-          <td>{{ r.productType }}</td>
-          <td>
-            <span [class]="'chip ' + movementTypeClass(r.stockMovementType)">
-              {{ movementTypeLabel(r.stockMovementType) }}
-            </span>
-          </td>
-          <td class="text-end">{{ r.quantitySigned | number: '1.0-2' }}</td>
-          <td class="text-end">{{ (r.unitPrice ?? 0) | number: '1.0-2' }}</td>
-          <td class="text-end">{{ (r.amountExclVat ?? 0) | number: '1.0-2' }}</td>
-          <!-- <td class="text-end">{{ (r.amountVat ?? 0) | number: '1.0-2' }}</td>
-          <td class="text-end">{{ (r.amountInclVat ?? 0) | number: '1.0-2' }}</td> -->
-        </tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- Pagination -->
-  <div class="sm-footer" *ngIf="totalCount() > 0">
-    <div class="sm-footer-left">
-      <label class="me-2">Rows per page</label>
-      <select
-        class="form-select form-select-sm d-inline-block w-auto"
-        [value]="pageSize()"
-        (change)="onPageSizeChange($any($event.target).value)"
+    <div class="stock-movement-table-wrap">
+      <nz-table
+        [nzData]="rows()"
+        [nzLoading]="loading()"
+        [nzFrontPagination]="false"
+        [nzTotal]="totalCount()"
+        [nzPageIndex]="pageIndex()"
+        [nzPageSize]="pageSize()"
+        [nzShowSizeChanger]="true"
+        [nzPageSizeOptions]="[10, 25, 50, 100]"
+        nzTableLayout="fixed"
+        (nzQueryParams)="onQueryParamsChange($event)"
       >
-        <option [value]="10">10</option>
-        <option [value]="25">25</option>
-        <option [value]="50">50</option>
-        <option [value]="100">100</option>
-      </select>
-    </div>
+        <thead>
+          <tr>
+            <th *ngFor="let col of visibleColumns"
+                [nzWidth]="col.width"
+                [nzColumnKey]="col.key"
+                [nzSortFn]="col.sortable"
+                [ngClass]="col.class"
+                [nzSortOrder]="sortOrder(col.key)">
+              {{ col.label }}
+            </th>
+          </tr>
+        </thead>
 
-    <div class="sm-footer-middle">
-      {{ visibleFrom() }}–{{ visibleTo() }} of {{ totalCount() }}
-    </div>
-
-    <div class="sm-footer-right">
-      <button
-        type="button"
-        class="btn btn-sm btn-outline-secondary me-1"
-        (click)="changePage(-1)"
-        [disabled]="pageIndex() === 0"
-      >
-        ‹ Prev
-      </button>
-
-      <span class="mx-2">
-        Page {{ pageIndex() + 1 }}
-      </span>
-
-      <button
-        type="button"
-        class="btn btn-sm btn-outline-secondary"
-        (click)="changePage(1)"
-        [disabled]="visibleTo() >= totalCount()"
-      >
-        Next ›
-      </button>
+        <tbody>
+          <tr *ngFor="let r of rows(); trackBy: trackRow">
+            <td *ngFor="let col of visibleColumns" [ngClass]="col.class">
+              <ng-container [ngSwitch]="col.key">
+                <ng-container *ngSwitchCase="'MovementDate'">{{ r.movementDate | date: 'dd MMM yyyy HH:mm' }}</ng-container>
+                <ng-container *ngSwitchCase="'BranchName'">
+                  <span nz-tooltip [nzTooltipTitle]="r.branchName" class="cell-ellipsis">{{ r.branchName }}</span>
+                </ng-container>
+                <ng-container *ngSwitchCase="'StockMovementNo'">
+                  <span nz-tooltip [nzTooltipTitle]="r.stockMovementNo" class="cell-ellipsis">{{ r.stockMovementNo }}</span>
+                </ng-container>
+                <ng-container *ngSwitchCase="'StockMovementType'">
+                  <nz-tag [nzColor]="movementTypeTagColor(r.stockMovementType)">
+                    {{ movementTypeLabel(r.stockMovementType) }}
+                  </nz-tag>
+                </ng-container>
+                <ng-container *ngSwitchCase="'ProductName'">
+                  <span nz-tooltip [nzTooltipTitle]="r.productName" class="cell-ellipsis">{{ r.productName }}</span>
+                </ng-container>
+                <ng-container *ngSwitchCase="'ProductType'">
+                  <span nz-tooltip [nzTooltipTitle]="r.productType" class="cell-ellipsis">{{ r.productType }}</span>
+                </ng-container>
+                <ng-container *ngSwitchCase="'QuantitySigned'" class="text-end">{{ r.quantitySigned | number:'1.0-2' }}</ng-container>
+                <ng-container *ngSwitchCase="'UnitPrice'" class="text-end">{{ (r.unitPrice ?? 0) | number:'1.0-2' }}</ng-container>
+                <ng-container *ngSwitchCase="'AmountExclVat'" class="text-end">{{ (r.amountExclVat ?? 0) | number:'1.0-2' }}</ng-container>
+              </ng-container>
+            </td>
+          </tr>
+        </tbody>
+      </nz-table>
     </div>
   </div>
 </div>

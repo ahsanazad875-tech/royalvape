@@ -11,6 +11,7 @@
     "Menu:StockMovement": "Stock Movement",
     "Menu:ShoppingCart": "Shopping Cart",
     "Menu:AddStock": "Add New Stock",
+    "Menu:PhysicalInventory": "Physical Inventory",
     "Actions": "Actions",
     "Close": "Close",
     "Delete": "Delete",
@@ -45,8 +46,10 @@
     "Permission:Delete": "Deleting the item",
     "Permission:Dashboard": "Viewing the dashboard", 
     "Permission:StockMovements.AllBranches": "Access all the branches", 
+    "Permission:StockMovements.PhysicalInventory": "PhysicalInventory", 
     "Menu:Home": "Home",
     "LongWelcomeMessage": "Welcome to the application. This is a startup project based on the ABP framework. For more information visit",
-    "Welcome": "Welcome"
+    "Welcome": "Welcome",
+    "SendPasswordResetLink": "Send Password Reset Link"
   }
 }

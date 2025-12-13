@@ -2,19 +2,23 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
+import { ConfigStateService } from '@abp/ng.core';
 import { environment } from 'src/environments/environment';
-import { ProductDto, ProductService, UoMEnum } from 'src/app/proxy/products';
+
+import { BranchService, BranchDto } from 'src/app/proxy/branches';
+import { UoMEnum } from 'src/app/proxy/products';
+
 import {
   CreateUpdateStockMovementDetailDto,
   CreateUpdateStockMovementHeaderDto,
+  ProductStockListItemDto,
+  ProductStockListRequestDto,
   StockMovementService,
-  StockMovementType
+  StockMovementType,
 } from 'src/app/proxy/stock-movements';
-import { BranchService, BranchDto } from 'src/app/proxy/branches';
-import { ConfigStateService } from '@abp/ng.core';
 
 type CartLine = {
-  product: ProductDto;
+  product: ProductStockListItemDto;
   quantity: number;
   unitPrice: number;
   discountAmount: number;
@@ -25,17 +29,28 @@ type CartLine = {
   standalone: true,
   imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './cart.html',
-  styleUrls: ['./cart.scss']
+  styleUrls: ['./cart.scss'],
 })
 export class Cart implements OnInit {
-  products: ProductDto[] = [];
-  filtered: ProductDto[] = [];
+  // current backend page
+  products: ProductStockListItemDto[] = [];
+  totalCount = 0;
+
   branches: BranchDto[] = [];
+
   search = '';
   branchId?: string;
+
   lines: CartLine[] = [];
   vatRate = 0;
   isAdmin = false;
+
+  customerName = '';
+
+  // pagination (BACKEND)
+  pageSizeOptions = [8, 12, 24, 48];
+  pageSize = 8;
+  currentPage = 1;
 
   // Currency symbol
   currencySymbol: string =
@@ -43,47 +58,50 @@ export class Cart implements OnInit {
     (environment as any)?.currencySymbol ??
     'Rs';
 
-  // productId -> onHand
-  private stockMap: Record<string, number> = {};
   showInStockOnly = false;
   loadingStock = false;
 
+  // API base for images
+  apiBase = ((environment as any)?.apis?.default?.url || '').replace(/\/+$/, '');
+
+  // local cache so cart items can still resolve latest onHand if they appear in any loaded page
+  private productIndex = new Map<string, ProductStockListItemDto>();
+
   private typeIcons: Record<string, string> = {
-    'device': 'fa-solid fa-mobile-screen-button',
-    'mod': 'fa-solid fa-mobile-screen',
-    'pod': 'fa-solid fa-battery-three-quarters',
-    'coil': 'fa-solid fa-screwdriver-wrench',
+    device: 'fa-solid fa-mobile-screen-button',
+    mod: 'fa-solid fa-mobile-screen',
+    pod: 'fa-solid fa-battery-three-quarters',
+    coil: 'fa-solid fa-screwdriver-wrench',
     'e-liquid': 'fa-solid fa-droplet',
     'e liquid': 'fa-solid fa-droplet',
-    'juice': 'fa-solid fa-bottle-droplet',
-    'accessory': 'fa-solid fa-plug',
-    'charger': 'fa-solid fa-bolt',
-    'tank': 'fa-solid fa-flask',
-    'battery': 'fa-solid fa-battery-full'
+    juice: 'fa-solid fa-bottle-droplet',
+    accessory: 'fa-solid fa-plug',
+    charger: 'fa-solid fa-bolt',
+    tank: 'fa-solid fa-flask',
+    battery: 'fa-solid fa-battery-full',
   };
 
+  private searchDebounce?: any;
+
   constructor(
-    private productSvc: ProductService,
     private stockSvc: StockMovementService,
     private branchSvc: BranchService,
     private config: ConfigStateService,
-    private router: Router
+    private router: Router,
   ) {}
 
   ngOnInit(): void {
-    const user = this.config.getOne('currentUser');
-    this.isAdmin = !!user?.roles?.some(r => r.toLowerCase() === 'admin');
+    const user = this.config.getOne('currentUser') as any;
+    const roles: string[] = (user?.roles ?? []).map((r: any) => String(r).toLowerCase());
+    this.isAdmin = roles.includes('admin');
 
     const allCfg = this.config.getAll() as any;
+
     const vatFromCfg = allCfg?.extraProperties?.pos?.vatPerc;
-    if (vatFromCfg != null) {
-      this.vatRate = Number(vatFromCfg) || this.vatRate;
-    }
+    if (vatFromCfg != null) this.vatRate = Number(vatFromCfg) || this.vatRate;
 
     const currencyFromCfg = allCfg?.extraProperties?.pos?.currencySymbol;
-    if (currencyFromCfg) {
-      this.currencySymbol = String(currencyFromCfg);
-    }
+    if (currencyFromCfg) this.currencySymbol = String(currencyFromCfg);
 
     if (this.isAdmin) {
       this.branchSvc.getList({ skipCount: 0, maxResultCount: 1000 }).subscribe(res => {
@@ -95,170 +113,218 @@ export class Cart implements OnInit {
           this.vatRate = Number(first.vatPerc / 100) || this.vatRate;
         }
 
-        this.loadProductsAndStock();
+        this.loadProductsPage(1);
       });
     } else {
-      this.loadProductsAndStock();
+      this.loadProductsPage(1);
     }
   }
 
-  // --- Loading ---
+  // =============================
+  // Backend pagination helpers
+  // =============================
 
-  private loadProductsAndStock() {
-    this.productSvc.getList({ skipCount: 0, maxResultCount: 1000 })
-      .subscribe(res => {
-        this.products = res.items;
-        this.filtered = this.products;
-        this.refreshStock();
-      });
+  get totalPages(): number {
+    return this.totalCount ? Math.ceil(this.totalCount / this.pageSize) : 1;
   }
 
-  refreshStock() {
-    if (!this.products?.length) return;
+  get pageStart(): number {
+    if (!this.totalCount) return 0;
+    return (this.currentPage - 1) * this.pageSize + 1;
+  }
 
+  get pageEnd(): number {
+    if (!this.totalCount) return 0;
+    return Math.min(this.currentPage * this.pageSize, this.totalCount);
+  }
+
+  private loadProductsPage(page: number) {
+    if (page < 1) page = 1;
+
+    this.currentPage = page;
     this.loadingStock = true;
 
-    const productIds = this.products.map(p => p.id as any);
-    const branch = this.isAdmin ? (this.branchId as any) : null;
+    const req: ProductStockListRequestDto = {
+      skipCount: (this.currentPage - 1) * this.pageSize,
+      maxResultCount: this.pageSize, // ✅ backend page size
+      // sorting not needed; backend is already sorting by OnHand desc
+      sorting: undefined as any,
 
-    this.stockSvc.getOnHandMap(productIds, branch).subscribe({
-      next: (map: Record<string, number>) => {
-        this.stockMap = this.toStringNumberMap(map);
-        this.postStockRefresh();
+      branchId: this.isAdmin ? (this.branchId as any) : undefined,
+      filter: this.search?.trim() ? this.search.trim() : undefined,
+
+      productId: undefined,
+      productTypeId: undefined,
+
+      onlyAvailable: this.showInStockOnly,
+    } as any;
+
+    this.stockSvc.getProductStockList(req).subscribe({
+      next: res => {
+        this.products = res.items ?? [];
+        this.totalCount = Number(res.totalCount ?? 0);
+
+        // cache products for cart lookups
+        for (const p of this.products) {
+          this.productIndex.set(String(p.id), p);
+        }
+
+        this.loadingStock = false;
+        this.clampCartToStock();
       },
-      error: _ => this.tryListVersion(branch, productIds)
+      error: () => {
+        this.loadingStock = false;
+        this.products = [];
+        this.totalCount = 0;
+      },
     });
   }
 
-  // Base URL of your API (ABP environments usually expose this)
-  apiBase = ((environment as any)?.apis?.default?.url || '').replace(/\/+$/, '');
+  onBranchChanged() {
+    const b = this.branches.find(x => x.id === this.branchId) as any;
+    if (b && b.vatPerc != null) {
+      this.vatRate = Number(b.vatPerc / 100) || this.vatRate;
+    }
 
-  /** Build a usable image URL for a product */
-  imgSrc(p: ProductDto): string | null {
+    // branch affects stock; safest is to clear the cart
+    this.clear();
+    this.productIndex.clear();
+
+    this.loadProductsPage(1);
+  }
+
+  onSearchInput() {
+    clearTimeout(this.searchDebounce);
+    this.searchDebounce = setTimeout(() => {
+      this.loadProductsPage(1);
+    }, 250);
+  }
+
+  onToggleInStockOnly() {
+    this.loadProductsPage(1);
+  }
+
+  setPageSize(size: number) {
+    this.pageSize = size;
+    this.loadProductsPage(1);
+  }
+
+  nextPage() {
+    if (this.currentPage < this.totalPages) this.loadProductsPage(this.currentPage + 1);
+  }
+
+  prevPage() {
+    if (this.currentPage > 1) this.loadProductsPage(this.currentPage - 1);
+  }
+
+  // =============================
+  // UI helpers
+  // =============================
+
+  get selectedBranchName(): string {
+    const b = this.branches.find(x => x.id === this.branchId);
+    return b?.name ?? '—';
+  }
+
+  imgSrc(p: ProductStockListItemDto): string | null {
     const raw = (p as any)?.imageUrl as string | undefined;
     if (!raw) return null;
-    if (/^https?:\/\//i.test(raw)) return raw;              // already absolute
-    const path = raw.replace(/^\/+/, '');                   // strip leading slashes
+    if (/^https?:\/\//i.test(raw)) return raw;
+    const path = raw.replace(/^\/+/, '');
     return this.apiBase ? `${this.apiBase}/${path}` : `/${path}`;
   }
 
-  private tryListVersion(branch: any, productIds: any[]) {
-    if ((this.stockSvc as any).getOnHandList) {
-      (this.stockSvc as any).getOnHandList(branch, productIds).subscribe({
-        next: (items: Array<{ productId: string; onHand: number }> | any) => {
-          const list = Array.isArray(items) ? items : (items?.items ?? []);
-          const map: Record<string, number> = {};
-          list.forEach((x: any) => (map[String(x.productId)] = Number(x.onHand) || 0));
-          this.stockMap = map;
-          this.postStockRefresh();
-        },
-        error: _ => this.fallbackFromProductDto()
-      });
-    } else {
-      this.fallbackFromProductDto();
-    }
+  onHand(p: ProductStockListItemDto): number {
+    const id = String(p.id);
+    const latest = this.productIndex.get(id);
+    return Number((latest as any)?.onHand ?? (p as any)?.onHand ?? 0) || 0;
   }
 
-  private fallbackFromProductDto() {
-    const map: Record<string, number> = {};
-    this.products.forEach(p => {
-      const guessed =
-        (p as any).stockOnHand ??
-        (p as any).quantityOnHand ??
-        (p as any).onHand ??
-        0;
-      map[String(p.id)] = Number(guessed) || 0;
-    });
-    this.stockMap = map;
-    this.postStockRefresh();
-  }
-
-  private toStringNumberMap(src: any): Record<string, number> {
-    const out: Record<string, number> = {};
-    if (!src) return out;
-    for (const k in src) {
-      if (Object.prototype.hasOwnProperty.call(src, k)) {
-        out[String(k)] = Number((src as any)[k]) || 0;
-      }
-    }
-    return out;
-  }
-
-  private postStockRefresh() {
-    this.loadingStock = false;
-    this.filter();
-    this.lines.forEach(l => {
-      const maxQty = this.onHand(l.product);
-      if (l.quantity > maxQty) l.quantity = Math.max(0, maxQty);
-    });
-    this.lines = this.lines.filter(l => l.quantity > 0);
-  }
-
-  // --- Helpers ---
-
-  onHand(p: ProductDto): number {
-    return this.stockMap[String(p.id)] ?? 0;
-  }
-
-  iconFor(p: ProductDto): string {
-    const t = (p.productTypeName || '').toLowerCase();
+  iconFor(p: ProductStockListItemDto): string {
+    const t = String((p as any)?.productType || '').toLowerCase();
     for (const key of Object.keys(this.typeIcons)) {
       if (t.includes(key)) return this.typeIcons[key];
     }
     return 'fa-solid fa-box';
   }
 
-  alreadyInCart(p: ProductDto) {
-    return this.lines.some(x => x.product.id === p.id);
+  alreadyInCart(p: ProductStockListItemDto) {
+    return this.lines.some(x => String(x.product.id) === String(p.id));
   }
 
-  trackByLine = (_: number, l: CartLine) => l.product.id;
+  trackByLine = (_: number, l: CartLine) => String(l.product.id);
 
-  // --- Filtering ---
+  // =============================
+  // Cart + pricing guards
+  // =============================
 
-  filter() {
-    const q = this.search.trim().toLowerCase();
+  private clampCartToStock() {
+    this.lines.forEach(l => {
+      const maxQty = this.onHand(l.product);
+      if (l.quantity > maxQty) l.quantity = Math.max(0, maxQty);
+      this.clampDiscountToCost(l);
+    });
 
-    let base = !q
-      ? this.products
-      : this.products.filter(p =>
-          (p.productName || '').toLowerCase().includes(q) ||
-          (p.productNo || '').toLowerCase().includes(q) ||
-          (p.productTypeName || '').toLowerCase().includes(q)
-        );
-
-    if (this.showInStockOnly) {
-      base = base.filter(p => this.onHand(p) > 0);
-    }
-
-    this.filtered = base;
+    this.lines = this.lines.filter(l => l.quantity > 0);
   }
 
-  // --- Cart ops (stock-aware) ---
+  private minUnitPrice(p: ProductStockListItemDto): number {
+    const purchase = Number((p as any).buyingUnitPrice ?? 0);
+    return Number.isFinite(purchase) && purchase > 0 ? purchase : 0;
+  }
 
-  addToCart(p: ProductDto) {
+  private getClampedDiscount(l: CartLine, candidate: number): number {
+    const qty = Number(l.quantity) || 0;
+    const unitPrice = Number(l.unitPrice) || 0;
+    const minPrice = this.minUnitPrice(l.product);
+
+    if (qty <= 0 || unitPrice <= 0) return 0;
+
+    const maxDiscountByCost = Math.max(0, qty * (unitPrice - minPrice));
+    const maxDiscountByZero = qty * unitPrice;
+
+    let maxDiscount = maxDiscountByCost || maxDiscountByZero;
+    if (maxDiscount < 0) maxDiscount = 0;
+
+    let v = Number(candidate);
+    if (!Number.isFinite(v) || v < 0) v = 0;
+    if (v > maxDiscount) v = maxDiscount;
+
+    return +v.toFixed(2);
+  }
+
+  private clampDiscountToCost(l: CartLine) {
+    l.discountAmount = this.getClampedDiscount(l, Number(l.discountAmount) || 0);
+  }
+
+  // ✅ uses id everywhere
+  addToCart(p: ProductStockListItemDto) {
     const inStock = this.onHand(p);
     if (inStock <= 0) return;
 
-    const line = this.lines.find(x => x.product.id === p.id);
+    const id = String(p.id);
+    const latest = this.productIndex.get(id) ?? p;
+
+    const line = this.lines.find(x => String(x.product.id) === id);
     if (line) {
       const next = Math.min(Number(line.quantity || 0) + 1, inStock);
       if (next !== line.quantity) {
         line.quantity = next;
+        this.clampDiscountToCost(line);
         this.lines = [...this.lines];
       }
       return;
     }
 
-    this.lines = [
-      ...this.lines,
-      {
-        product: p,
-        quantity: 1,
-        unitPrice: p.sellingUnitPrice ?? 0,
-        discountAmount: 0
-      }
-    ];
+    const l: CartLine = {
+      product: latest,
+      quantity: 1,
+      unitPrice: Number((latest as any).sellingUnitPrice ?? 0),
+      discountAmount: 0,
+    };
+
+    this.clampDiscountToCost(l);
+    this.lines = [...this.lines, l];
   }
 
   inc(l: CartLine) {
@@ -266,6 +332,7 @@ export class Cart implements OnInit {
     const q = Number(l.quantity || 0);
     if (q < maxQty) {
       l.quantity = q + 1;
+      this.clampDiscountToCost(l);
       this.lines = [...this.lines];
     }
   }
@@ -274,6 +341,7 @@ export class Cart implements OnInit {
     const q = Number(l.quantity || 0);
     if (q > 1) {
       l.quantity = q - 1;
+      this.clampDiscountToCost(l);
       this.lines = [...this.lines];
     } else {
       this.remove(l);
@@ -283,98 +351,83 @@ export class Cart implements OnInit {
   qtyChanged(l: CartLine) {
     const maxQty = this.onHand(l.product);
     l.quantity = Number(l.quantity);
+
     if (!Number.isFinite(l.quantity) || l.quantity < 1) l.quantity = 1;
     if (l.quantity > maxQty) l.quantity = Math.max(0, maxQty);
-    if (l.quantity === 0) this.remove(l);
-    else this.lines = [...this.lines];
-  }
 
-  discountChanged(l: CartLine, val: any) {
-    l.discountAmount = Math.max(0, Number(val) || 0);
+    if (l.quantity === 0) {
+      this.remove(l);
+      return;
+    }
+
+    this.clampDiscountToCost(l);
     this.lines = [...this.lines];
   }
 
-  remaining(l: CartLine): number {
-    return Math.max(0, this.onHand(l.product) - Number(l.quantity || 0));
+  discountChanged(l: CartLine, raw: any, inputEl: HTMLInputElement) {
+    const clamped = this.getClampedDiscount(l, Number(raw) || 0);
+    l.discountAmount = clamped;
+    if (inputEl) inputEl.value = clamped ? clamped.toString() : '';
+    this.lines = [...this.lines];
   }
 
   remove(l: CartLine) {
     this.lines = this.lines.filter(x => x !== l);
   }
 
-  clear() { this.lines = []; }
-
-  // --- Totals & checkout ---
-
-  get totals() {
-    const ex = this.lines.reduce(
-      (a, l) =>
-        a +
-        Math.max(
-          0,
-          Number(l.quantity) * Number(l.unitPrice) -
-            Number(l.discountAmount || 0)
-        ),
-      0
-    );
-    const vat = ex * this.vatRate;
-    const inc = ex + vat;
-    return { ex: +ex.toFixed(2), vat: +vat.toFixed(2), inc: +inc.toFixed(2) };
+  clear() {
+    this.lines = [];
   }
 
-  private validateAgainstStock(): string[] {
-    const errors: string[] = [];
-    for (const l of this.lines) {
-      const available = this.onHand(l.product);
-      if (l.quantity > available) {
-        errors.push(
-          `${l.product.productName} (wanted ${l.quantity}, available ${available})`
-        );
-      }
-    }
-    return errors;
+  get totals() {
+    const ex = this.lines.reduce((a, l) => {
+      const lineGross = Number(l.quantity) * Number(l.unitPrice);
+      const disc = Number(l.discountAmount || 0);
+      const net = Math.max(0, lineGross - disc);
+      return a + net;
+    }, 0);
+
+    const vat = ex * this.vatRate;
+    const inc = ex + vat;
+
+    return { ex: +ex.toFixed(2), vat: +vat.toFixed(2), inc: +inc.toFixed(2) };
   }
 
   checkout() {
     if (!this.lines.length) return;
 
-    const over = this.validateAgainstStock();
-    if (over.length) {
-      alert('Some lines exceed available stock:\n\n' + over.join('\n'));
-      return;
-    }
+    this.lines.forEach(l => this.clampDiscountToCost(l));
 
     const header: CreateUpdateStockMovementHeaderDto = {
       stockMovementNo: '',
       stockMovementType: StockMovementType.Sale,
-      businessPartnerName: '',
+      businessPartnerName: this.customerName.trim() || '',
       description: 'POS Sale',
       amountExclVat: this.totals.ex,
       amountVat: this.totals.vat,
       amountInclVat: this.totals.inc,
       ...(this.isAdmin && this.branchId ? { branchId: this.branchId as any } : {}),
       details: this.lines.map<CreateUpdateStockMovementDetailDto>(l => {
-        const ex = Math.max(
-          0,
-          Number(l.quantity) * Number(l.unitPrice) -
-            Number(l.discountAmount || 0)
-        );
+        const lineGross = Number(l.quantity) * Number(l.unitPrice);
+        const disc = Number(l.discountAmount || 0);
+        const ex = Math.max(0, lineGross - disc);
+
         return {
-          productId: l.product.id as any,
-          uoM: l.product.uoM,
+          productId: l.product.id as any, // ✅ id everywhere
+          uoM: (l.product as any).uoM,
           quantity: l.quantity,
           unitPrice: l.unitPrice,
           discountAmount: l.discountAmount,
           amountExclVat: +ex.toFixed(2),
           amountVat: +(ex * this.vatRate).toFixed(2),
-          amountInclVat: +(ex * (1 + this.vatRate)).toFixed(2)
+          amountInclVat: +(ex * (1 + this.vatRate)).toFixed(2),
         };
       }),
-      isCancelled: false
-    };
+      isCancelled: false,
+    } as any;
 
-    // UoM enum normalization (if backend expects number)
-    header.details!.forEach(d => {
+    // only if backend expects numeric enum
+    header.details?.forEach(d => {
       if (
         typeof (UoMEnum as any).Piece === 'number' &&
         typeof d.uoM === 'string' &&
@@ -388,19 +441,5 @@ export class Cart implements OnInit {
       this.clear();
       this.router.navigateByUrl('/stock-report');
     });
-  }
-
-  // UI helpers
-  get selectedBranchName(): string {
-    const b = this.branches.find(x => x.id === this.branchId);
-    return b?.name ?? '—';
-  }
-
-  onBranchChanged() {
-    const b = this.branches.find(x => x.id === this.branchId) as any;
-    if (b && b.vatPerc != null) {
-      this.vatRate = Number(b.vatPerc / 100) || this.vatRate;
-    }
-    this.refreshStock();
   }
 }

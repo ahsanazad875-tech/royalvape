@@ -1,4 +1,4 @@
-import type { CreateUpdateStockMovementHeaderDto, DailySalesPointDto, OnHandItemDto, ProductMovementDto, ProductMovementFlatRequestDto, StockByProductTypeDto, StockDashboardSummaryDto, StockMovementHeaderDto, StockReportDto } from './models';
+import type { CreateUpdateStockMovementHeaderDto, DailySalesPointDto, OnHandItemDto, ProductMovementDto, ProductMovementFlatRequestDto, ProductStockListItemDto, ProductStockListRequestDto, StockByProductTypeDto, StockDashboardSummaryDto, StockMovementHeaderDto, StockReportDto } from './models';
 import { RestService, Rest } from '@abp/ng.core';
 import type { PagedAndSortedResultRequestDto, PagedResultDto } from '@abp/ng.core';
 import { Injectable } from '@angular/core';
@@ -125,6 +125,15 @@ export class StockMovementService {
     { apiName: this.apiName,...config });
   
 
+  getProductStockList = (input: ProductStockListRequestDto, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, PagedResultDto<ProductStockListItemDto>>({
+      method: 'GET',
+      url: '/api/app/stock-movement/product-stock-list',
+      params: { branchId: input.branchId, filter: input.filter, productId: input.productId, productTypeId: input.productTypeId, onlyAvailable: input.onlyAvailable, sorting: input.sorting, skipCount: input.skipCount, maxResultCount: input.maxResultCount },
+    },
+    { apiName: this.apiName,...config });
+  
+
   getStockByProductType = (branchId?: string, config?: Partial<Rest.Config>) =>
     this.restService.request<any, StockByProductTypeDto[]>({
       method: 'GET',
@@ -134,11 +143,11 @@ export class StockMovementService {
     { apiName: this.apiName,...config });
   
 
-  getStockReport = (branchId?: string, productId?: string, config?: Partial<Rest.Config>) =>
-    this.restService.request<any, StockReportDto[]>({
+  getStockReport = (input: ProductStockListRequestDto, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, PagedResultDto<StockReportDto>>({
       method: 'GET',
       url: '/api/app/stock-movement/stock-report',
-      params: { branchId, productId },
+      params: { branchId: input.branchId, filter: input.filter, productId: input.productId, productTypeId: input.productTypeId, onlyAvailable: input.onlyAvailable, sorting: input.sorting, skipCount: input.skipCount, maxResultCount: input.maxResultCount },
     },
     { apiName: this.apiName,...config });
   

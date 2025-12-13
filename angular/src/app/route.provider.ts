@@ -35,6 +35,7 @@ function configureRoutes() {
         iconClass: 'fa fa-box',
         layout: eLayoutType.application,
         requiredPolicy: 'POS.Products',
+        order: 3,
       },
       {
         path: '/product-types',
@@ -42,6 +43,7 @@ function configureRoutes() {
         iconClass: 'fa fa-tags',
         layout: eLayoutType.application,
         requiredPolicy: 'POS.ProductTypes',
+        order: 2,
       },
       {
         path: '/stock-movement',
@@ -49,7 +51,15 @@ function configureRoutes() {
         iconClass: 'fa fa-chart-bar',
         layout: eLayoutType.application,
         requiredPolicy: 'POS.StockMovements',
-        order: 20,
+        order: 4,
+      },
+      {
+        path: '/physical-inventory',
+        name: '::Menu:PhysicalInventory',
+        iconClass: 'fa fa-chart-bar',
+        layout: eLayoutType.application,
+        requiredPolicy: 'POS.StockMovements.PhysicalInventory',
+        order: 5,
       },
       {
         path: '/stock-report',
@@ -57,7 +67,7 @@ function configureRoutes() {
         iconClass: 'fa fa-chart-bar',
         layout: eLayoutType.application,
         requiredPolicy: 'POS.StockMovements',
-        order: 20,
+        order: 6,
       },
       {
         path: '/shopping-cart',
@@ -65,7 +75,7 @@ function configureRoutes() {
         iconClass: 'fa fa-shopping-cart',
         layout: eLayoutType.application,
         requiredPolicy: 'POS.StockMovements.Create',
-        order: 21,
+        order: 7,
       },
     ];
 
@@ -77,7 +87,7 @@ function configureRoutes() {
         iconClass: 'fa fa-dolly',
         layout: eLayoutType.application,
         requiredPolicy: 'POS.StockMovements.Create',
-        order: 22,
+        order: 8,
       },
       {
         path: '/branches',
@@ -85,6 +95,7 @@ function configureRoutes() {
         iconClass: 'fa fa-code-branch',
         layout: eLayoutType.application,
         requiredPolicy: 'POS.Branches',
+        order: 9,
       },
     ];
 

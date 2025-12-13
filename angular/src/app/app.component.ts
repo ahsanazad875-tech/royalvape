@@ -78,6 +78,12 @@ export class AppComponent implements OnInit, OnDestroy {
     permission: 'POS.StockMovements',
   },
   {
+    label: 'Physical Inventory',
+    icon: 'fa fa-clipboard-list',
+    link: '/physical-inventory',
+    permission: 'POS.StockMovements.PhysicalInventory',
+  },
+  {
     label: 'Shopping Cart',
     icon: 'fa fa-shopping-cart',
     link: '/shopping-cart',

@@ -1,15 +1,36 @@
+/* =========================================================
+   APP SHELL LAYOUT (UPDATED)
+   Fixes:
+   - Prevent page-level horizontal overflow (black area)
+   - Allow flex children to shrink (min-width:0)
+   - Keep overflow inside components like nz-table (nzScroll)
+   ========================================================= */
+
+/* Prevent page-level horizontal overflow */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 .app-shell {
   display: flex;
   min-height: 100vh;
+  width: 100%;
+  min-width: 0;         /* CRITICAL for flex layouts */
   background: #f3f4f6;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   color: #111827;
+  overflow-x: hidden;   /* keeps any overflow inside intended scrollers */
 }
 
-/* SIDEBAR */
+/* =========================================================
+   SIDEBAR
+   ========================================================= */
 
 .app-sidebar {
   width: 260px;
+  flex: 0 0 260px; /* stable width, doesn't shrink */
   background: radial-gradient(circle at top left, #172542 0, #141c3f 45%, #020617 100%);
   color: #e5e7eb;
   padding: 1.25rem 1.1rem;
@@ -37,10 +58,9 @@
   border-radius: 999px;
   background: linear-gradient(135deg, #2563eb, #38bdf8);
   box-shadow: 0 6px 18px rgba(37, 99, 235, 0.45);
-  overflow: hidden; /* important so the image doesn't spill out */
+  overflow: hidden;
 }
 
-/* make the favicon fit nicely inside */
 .brand-logo img {
   width: 70%;
   height: 70%;
@@ -56,6 +76,7 @@
 .menu {
   flex: 1;
   font-size: 0.9rem;
+  min-width: 0; /* safe */
 }
 
 .menu-group {
@@ -79,11 +100,9 @@
   border-radius: 0.75rem;
   color: #9ca3af;
   text-decoration: none;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease,
-    transform 0.12s ease;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.12s ease;
   position: relative;
+  min-width: 0; /* allows text to shrink */
 }
 
 .menu-item i {
@@ -95,6 +114,7 @@
 
 .menu-text {
   white-space: nowrap;
+  min-width: 0;
 }
 
 .menu-item::before {
@@ -138,13 +158,18 @@
   font-size: 0.75rem;
 }
 
-/* MAIN LAYOUT */
+/* =========================================================
+   MAIN AREA
+   ========================================================= */
 
 .app-main {
-  flex: 1;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
+
+  min-width: 0;   /* CRITICAL: allows shrinking within flex row */
   max-width: 100%;
+  overflow-x: hidden; /* prevent page-level overflow; table should scroll internally */
 }
 
 .app-header {
@@ -158,6 +183,8 @@
   position: sticky;
   top: 0;
   z-index: 1020;
+
+  min-width: 0; /* safe */
 }
 
 .app-title {
@@ -176,12 +203,14 @@
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
+  min-width: 0; /* safe */
 }
 
 .app-header-right {
   display: flex;
   align-items: center;
   font-size: 0.85rem;
+  min-width: 0; /* safe */
 }
 
 .user-name {
@@ -221,14 +250,21 @@
   font-size: 0.85rem;
 }
 
+/* Content wrapper: allow shrink and avoid creating horizontal overflow */
 .app-content {
   padding: 1.5rem;
+  min-width: 0;       /* CRITICAL */
+  max-width: 100%;
+  overflow-x: hidden; /* keep overflow inside components (nz-table scroll) */
 }
 
-/* COLLAPSED STATE – DESKTOP */
+/* =========================================================
+   COLLAPSED STATE – DESKTOP
+   ========================================================= */
 
 .app-shell.is-collapsed .app-sidebar {
   width: 76px;
+  flex: 0 0 76px;
 }
 
 .app-shell.is-collapsed .brand-title,
@@ -251,19 +287,20 @@
   margin-right: 0;
 }
 
-/* RESPONSIVE */
+/* =========================================================
+   RESPONSIVE (MOBILE)
+   ========================================================= */
 
 @media (max-width: 768px) {
   .app-shell {
     flex-direction: column;
   }
 
-  /* header stays at the very top */
   .app-header {
     padding-inline: 1rem;
     flex-wrap: wrap;
     row-gap: 0.5rem;
-    z-index: 1040; /* above sidebar */
+    z-index: 1040;
   }
 
   .app-header-left {
@@ -280,13 +317,14 @@
     display: none;
   }
 
-  /* SIDEBAR AS DRAWER UNDER HEADER */
+  /* Sidebar as drawer under header */
   .app-sidebar {
     position: fixed;
-    top: 56px;              /* height of header (adjust if needed) */
+    top: 56px; /* adjust if your header height differs */
     bottom: 0;
     left: 0;
     width: 260px;
+    flex: 0 0 auto;
     z-index: 1030;
     transform: translateX(0);
   }
@@ -296,7 +334,6 @@
   }
 
   .app-main {
-    flex: 1;
     width: 100%;
   }
 

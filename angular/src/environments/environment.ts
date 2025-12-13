@@ -4,7 +4,7 @@ import { Environment } from '@abp/ng.core';
 const baseUrl = 'http://localhost:4200';
 
 const oAuthConfig = {
-  issuer: 'https://royalvape.onrender.com/',
+  issuer: 'https://localhost:44348/',
   redirectUri: baseUrl,
   clientId: 'POS_App',
   responseType: 'code',
@@ -21,13 +21,14 @@ export const environment = {
   oAuthConfig,
   apis: {
     default: {
-      url: 'https://royalvape.onrender.com/',
+      url: 'https://localhost:44348',
       rootNamespace: 'POS',
     },
     AbpAccountPublic: {
       url: oAuthConfig.issuer,
       rootNamespace: 'AbpAccountPublic',
     },
+    
   },
   remoteServiceErrorHandler: {
     showDetailedErrors: false,

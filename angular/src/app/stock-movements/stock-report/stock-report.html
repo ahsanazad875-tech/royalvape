@@ -1,147 +1,129 @@
-<div class="sm-card">
-  <div class="sm-header">
+<div class="card stock-report-card">
+  <div class="card-header stock-report-header">
     <div>
-      <h2 class="sm-title">Stock Report</h2>
-      <p class="sm-subtitle">Snapshot of on-hand stock by branch and product</p>
-    </div>
-
-    <span class="sm-summary" *ngIf="totalCount > 0">
-      Showing <b>{{ visibleFrom }}</b>–<b>{{ visibleTo }}</b> of
-      <b>{{ totalCount }}</b> rows
-    </span>
-  </div>
-
-  <!-- Filters -->
-  <div class="filter-card">
-    <div class="filter-card-header" (click)="filtersCollapsed = !filtersCollapsed">
-      <h3>Filters</h3>
-      <span class="toggle">{{ filtersCollapsed ? 'Show' : 'Hide' }}</span>
-    </div>
-
-    <div class="filter-card-body" *ngIf="!filtersCollapsed">
-      <form [formGroup]="form" class="filter-grid" (ngSubmit)="search()">
-        <div class="fg-item" *ngIf="isAdmin">
-          <label class="form-label" for="branchId">Branch</label>
-          <select
-            id="branchId"
-            class="form-select form-select-sm"
-            formControlName="branchId"
-          >
-            <option value="">All</option>
-            <option *ngFor="let b of branches" [value]="b.id">
-              {{ b.name }}
-            </option>
-          </select>
-        </div>
-
-        <div class="fg-item">
-          <label class="form-label" for="productId">Product</label>
-          <select
-            id="productId"
-            class="form-select form-select-sm"
-            formControlName="productId"
-          >
-            <option value="">All</option>
-            <option *ngFor="let p of products" [value]="p.id">
-              {{ p.name }}
-            </option>
-          </select>
-        </div>
-
-        <div class="fg-item fg-spacer"></div>
-
-        <!-- Actions -->
-        <div class="fg-item fg-actions">
-          <button
-            type="submit"
-            class="btn btn-primary btn-sm"
-            [disabled]="loading"
-          >
-            Search
-          </button>
-          <button
-            type="button"
-            class="btn btn-outline-secondary btn-sm"
-            (click)="reset()"
-            [disabled]="loading"
-          >
-            Reset
-          </button>
-        </div>
-      </form>
+      <h2 class="stock-report-title mb-1">Stock Report</h2>
+      <p class="mb-0 text-muted">
+        Snapshot of on-hand stock by branch and product
+      </p>
     </div>
   </div>
 
-  <!-- States -->
-  <div *ngIf="loading" class="sm-state sm-state-loading">Loading…</div>
-  <div *ngIf="!loading && totalCount === 0" class="sm-state sm-state-empty">
-    No stock found.
-  </div>
+  <div class="card-body stock-report-body">
+    <!-- Filters -->
+    <div class="card stock-report-filters mb-3">
+      <div class="card-header stock-report-filters__header" role="button"
+        (click)="filtersCollapsed = !filtersCollapsed">
+        <span class="fw-semibold">Filters</span>
+        <span class="stock-report-filters__toggle">
+          {{ filtersCollapsed ? 'Show' : 'Hide' }}
+        </span>
+      </div>
 
-  <!-- Table -->
-  <div class="table-wrap table-responsive" *ngIf="!loading && pagedRows.length">
-    <table class="table table-sm table-sticky-header sm-table">
-      <thead>
-        <tr>
-          <th>Branch</th>
-          <th>Product</th>
-          <th>Type</th>
-          <th class="text-end">Available Quantity</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let r of pagedRows; trackBy: trackRow">
-          <td>{{ r.branchName }}</td>
-          <td>{{ r.productName }}</td>
-          <td>{{ r.productType }}</td>
-          <td class="text-end">{{ r.onHand | number: '1.0-2' }}</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
+      <div class="card-body" *ngIf="!filtersCollapsed">
+        <form [formGroup]="form" (ngSubmit)="search(true)">
+          <div class="row g-3 align-items-end">
+            <!-- Branch -->
+            <div class="col-12 col-md-6 col-lg-2" *ngIf="isAdmin">
+              <label class="form-label">Branch</label>
+              <nz-select class="w-100" nzShowSearch nzAllowClear nzPlaceHolder="All" formControlName="branchId">
+                <nz-option nzValue="" nzLabel="All"></nz-option>
+                <nz-option *ngFor="let b of branches" [nzValue]="b.id" [nzLabel]="b.name"></nz-option>
+              </nz-select>
+            </div>
 
-  <!-- Pagination -->
-  <div class="sm-footer" *ngIf="totalCount > 0">
-    <div class="sm-footer-left">
-      <label class="me-2">Rows per page</label>
-      <select
-        class="form-select form-select-sm d-inline-block w-auto"
-        [value]="pageSize"
-        (change)="onPageSizeChange($any($event.target).value)"
-      >
-        <option [value]="10">10</option>
-        <option [value]="25">25</option>
-        <option [value]="50">50</option>
-        <option [value]="100">100</option>
-      </select>
+            <!-- Product -->
+            <div class="col-12 col-md-6 col-lg-3">
+              <label class="form-label">Product</label>
+              <nz-select class="w-100" nzShowSearch nzAllowClear nzPlaceHolder="All" formControlName="productId">
+                <nz-option nzValue="" nzLabel="All"></nz-option>
+                <nz-option *ngFor="let p of products" [nzValue]="p.id"
+                  [nzLabel]="p.productNo + ' ' + p.productName"></nz-option>
+              </nz-select>
+            </div>
+
+            <!-- Search -->
+            <div class="col-12 col-md-6 col-lg-3">
+              <label class="form-label" for="filter">Search</label>
+              <input id="filter" type="text" class="form-control form-control-sm" placeholder="Product no / name..."
+                formControlName="filter" />
+            </div>
+
+            <!-- Only available -->
+            <div class="col-12 col-md-6 col-lg-2">
+              <label class="form-label d-block">&nbsp;</label>
+              <label class="form-check mb-0 stock-report-onlyavailable">
+                <input class="form-check-input" type="checkbox" formControlName="onlyAvailable" />
+                <span class="form-check-label">Only available</span>
+              </label>
+            </div>
+
+            <!-- Actions -->
+            <div class="col-12 col-lg-2 ms-lg-auto">
+              <div class="stock-report-actions">
+                <button type="button" class="btn btn-outline-secondary btn-sm" (click)="reset()" [disabled]="loading">
+                  Reset
+                </button>
+
+                <button type="submit" class="btn btn-primary btn-sm" [disabled]="loading">
+                  Search
+                </button>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
     </div>
 
-    <div class="sm-footer-middle">
-      {{ visibleFrom }}–{{ visibleTo }} of {{ totalCount }}
+    <!-- Table -->
+    <div class="stock-report-table-wrap">
+      <nz-table class="stock-report-table" [nzData]="rows" [nzLoading]="loading" [nzFrontPagination]="false"
+        [nzTotal]="totalCount" [nzPageIndex]="pageIndex" [nzPageSize]="pageSize" [nzShowSizeChanger]="true"
+        [nzPageSizeOptions]="[10, 25, 50, 100]" nzTableLayout="fixed" [nzScroll]="{ x: '1120px' }"
+        (nzQueryParams)="onQueryParamsChange($event)">
+        <thead>
+          <tr>
+            <th nzWidth="100px" nzColumnKey="BranchName" [nzSortFn]="true" [nzSortOrder]="sortOrder(SORT.BranchName)">
+              Branch
+            </th>
+
+            <th nzWidth="300px" nzColumnKey="ProductName" [nzSortFn]="true" [nzSortOrder]="sortOrder(SORT.ProductName)">
+              Product
+            </th>
+
+            <th nzWidth="100px" nzColumnKey="ProductType" [nzSortFn]="true" [nzSortOrder]="sortOrder(SORT.ProductType)">
+              Type
+            </th>
+
+            <th nzWidth="50px" nzColumnKey="UoM" [nzSortFn]="true" [nzSortOrder]="sortOrder(SORT.UoM)">
+              UoM
+            </th>
+
+            <th nzWidth="100px" nzColumnKey="OnHand" [nzSortFn]="true" [nzSortOrder]="sortOrder(SORT.OnHand)"
+              class="text-end">
+               Quantity
+            </th>
+
+            <th nzWidth="120px" nzColumnKey="LastUpdated" [nzSortFn]="true" [nzSortOrder]="sortOrder(SORT.LastUpdated)">
+              Last Updated
+            </th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr *ngFor="let r of rows; trackBy: trackRow">
+            <td>{{ r.branchName }}</td>
+
+            <!-- Keep product from forcing table wider -->
+            <td class="cell-ellipsis" [title]="r.productName">{{ r.productName }}</td>
+
+            <td>{{ r.productType }}</td>
+            <td>{{ uomText(r) }}</td>
+            <td class="text-end">{{ r.onHand | number:'1.0-2' }}</td>
+            <td>{{ r.lastUpdated | date:'MMM d, y, h:mm a' }}</td>
+          </tr>
+        </tbody>
+      </nz-table>
     </div>
 
-    <div class="sm-footer-right">
-      <button
-        type="button"
-        class="btn btn-sm btn-outline-secondary me-1"
-        (click)="changePage(-1)"
-        [disabled]="pageIndex === 0"
-      >
-        ‹ Prev
-      </button>
-
-      <span class="mx-2">
-        Page {{ pageIndex + 1 }}
-      </span>
-
-      <button
-        type="button"
-        class="btn btn-sm btn-outline-secondary"
-        (click)="changePage(1)"
-        [disabled]="visibleTo >= totalCount"
-      >
-        Next ›
-      </button>
-    </div>
   </div>
 </div>

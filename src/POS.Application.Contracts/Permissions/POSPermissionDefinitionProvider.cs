@@ -33,6 +33,7 @@ public class POSPermissionDefinitionProvider : PermissionDefinitionProvider
         sm.AddChild(POSPermissions.StockMovements.Edit, L("Permission:Edit"));
         sm.AddChild(POSPermissions.StockMovements.Delete, L("Permission:Delete"));
         sm.AddChild(POSPermissions.StockMovements.AllBranches, L("Permission:StockMovements.AllBranches"));
+        sm.AddChild(POSPermissions.StockMovements.PhysicalInventory, L("Permission:StockMovements.PhysicalInventory"));
 
         var dashboard = myGroup.AddPermission(POSPermissions.Dashboard.Default, L("Permission:Dashboard"));
     }

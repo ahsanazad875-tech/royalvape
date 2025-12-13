@@ -250,6 +250,21 @@
     height: 34px;
     padding: 0.25rem 0.45rem;
   }
+
+  .ant-select {
+    width: 100%;
+  }
+
+  .ant-select-single.ant-select-sm {
+        font-size: 0.82rem;
+    height: 34px;
+    display: flex;
+    align-items: center;
+  }
+
+  .ant-select-selection-search-input {
+    height: 34px;
+  }
 }
 
 /* UOM pill */

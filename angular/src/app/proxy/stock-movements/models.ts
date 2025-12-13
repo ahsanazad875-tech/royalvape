@@ -40,6 +40,8 @@ export interface ProductMovementDto extends EntityDto<string> {
   headerId?: string;
   stockMovementNo?: string;
   movementDate?: string;
+  createdByUserId?: string;
+  createdBy?: string;
   branchId?: string;
   branchName?: string;
   stockMovementType?: StockMovementType;
@@ -62,6 +64,27 @@ export interface ProductMovementFlatRequestDto extends PagedAndSortedResultReque
   productTypeId?: string;
   stockMovementType?: StockMovementType;
   includeCancelled: boolean;
+}
+
+export interface ProductStockListItemDto extends EntityDto<string> {
+  productNo?: string;
+  productId?: string;
+  productName?: string;
+  productTypeId?: string;
+  productType?: string;
+  uoM?: UoMEnum;
+  buyingUnitPrice: number;
+  sellingUnitPrice: number;
+  imageUrl?: string;
+  onHand: number;
+}
+
+export interface ProductStockListRequestDto extends PagedAndSortedResultRequestDto {
+  branchId?: string;
+  filter?: string;
+  productId?: string;
+  productTypeId?: string;
+  onlyAvailable: boolean;
 }
 
 export interface StockByProductTypeDto {
@@ -110,5 +133,10 @@ export interface StockReportDto {
   productName?: string;
   productTypeId?: string;
   productType?: string;
+  uoM?: UoMEnum;
+  buyingUnitPrice: number;
+  sellingUnitPrice: number;
+  imageUrl?: string;
+  lastUpdated?: string;
   onHand: number;
 }

@@ -1,5 +1,5 @@
 import type { UoMEnum } from './uo-menum.enum';
-import type { FullAuditedEntityDto } from '@abp/ng.core';
+import type { FullAuditedEntityDto, PagedAndSortedResultRequestDto } from '@abp/ng.core';
 
 export interface CreateUpdateProductDto {
   productNo?: string;
@@ -24,4 +24,10 @@ export interface ProductDto extends FullAuditedEntityDto<string> {
   productTypeName?: string;
   creatorName?: string;
   modifiedBy?: string;
+}
+
+export interface ProductListRequestDto extends PagedAndSortedResultRequestDto {
+  productId?: string;
+  productTypeId?: string;
+  filter?: string;
 }

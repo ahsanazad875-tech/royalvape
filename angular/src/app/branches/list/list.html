@@ -1,4 +1,4 @@
-<div class="card branch-card shadow-sm">
+<div class="card shadow-sm">
   <div class="card-body">
     <div class="d-flex align-items-center mb-3">
       <button
@@ -8,12 +8,13 @@
         <i class="fa fa-plus me-1"></i> Create Branch
       </button>
 
-      <div class="toolbar gap-2 d-flex align-items-center">
+      <div class="d-flex align-items-center gap-2">
         <span class="text-muted small">
           Total: <strong>{{ total }}</strong>
         </span>
+
         <button
-          class="btn btn-outline-primary btn-sm"
+          class="btn btn-outline-secondary btn-sm"
           (click)="refresh()"
           [disabled]="loading"
           title="Refresh">
@@ -22,109 +23,102 @@
       </div>
     </div>
 
-    <div class="table-responsive">
-      <table class="table table-hover align-middle branch-table">
-        <thead>
-          <tr>
-            <th class="text-uppercase small fw-semibold text-muted">Code</th>
-            <th class="text-uppercase small fw-semibold text-muted">Name</th>
-            <th class="text-uppercase small fw-semibold text-muted text-end">VAT %</th>
-            <th class="text-uppercase small fw-semibold text-muted">Status</th>
-            <th class="text-end"></th>
-          </tr>
-        </thead>
+    <nz-table
+      [nzData]="rows"
+      [nzLoading]="loading"
+      [nzFrontPagination]="false"
+      [nzTotal]="total"
+      [nzPageIndex]="pageIndex"
+      [nzPageSize]="pageSize"
+      [nzShowSizeChanger]="true"
+      [nzPageSizeOptions]="[10, 20, 50, 100]"
+      nzTableLayout="fixed"
+      [nzScroll]="{ x: '900px' }"
+      (nzQueryParams)="onQueryParamsChange($event)"
+      [nzNoResult]="noResultTpl">
 
-        <tbody>
-          @if (loading) {
-            <tr>
-              <td colspan="5" class="text-center py-5">
-                <span class="spinner-border spinner-border-sm me-2"></span>
-                Loading branches…
-              </td>
-            </tr>
-          } @else {
-            @for (b of items; track trackById($index, b)) {
-              <tr>
-                <td class="code">{{ b.code }}</td>
+      <thead>
+        <tr>
+          <th
+            nzWidth="140px"
+            nzColumnKey="{{ SORT.Code }}"
+            [nzSortFn]="true"
+            [nzSortOrder]="sortOrder(SORT.Code)"
+            class="text-uppercase small fw-semibold text-muted">
+            Code
+          </th>
 
-                <td class="name fw-semibold">{{ b.name }}</td>
+          <th
+            nzWidth="320px"
+            nzColumnKey="{{ SORT.Name }}"
+            [nzSortFn]="true"
+            [nzSortOrder]="sortOrder(SORT.Name)"
+            class="text-uppercase small fw-semibold text-muted">
+            Name
+          </th>
 
-                <td class="text-end">
-                  <span class="badge rounded-pill bg-info-subtle text-dark px-3">
-                    {{ b.vatPerc | number: '1.0-2' }}%
-                  </span>
-                </td>
+          <th
+            nzWidth="120px"
+            nzColumnKey="{{ SORT.VatPerc }}"
+            [nzSortFn]="true"
+            [nzSortOrder]="sortOrder(SORT.VatPerc)"
+            class="text-uppercase small fw-semibold text-muted text-end">
+            VAT %
+          </th>
 
-                <td>
-                  <span
-                    class="badge status px-3"
-                    [class.bg-success]="b.isActive"
-                    [class.text-light]="b.isActive"
-                    [class.bg-secondary]="!b.isActive">
-                    {{ b.isActive ? 'Active' : 'Inactive' }}
-                  </span>
-                </td>
+          <th
+            nzWidth="140px"
+            nzColumnKey="{{ SORT.IsActive }}"
+            [nzSortFn]="true"
+            [nzSortOrder]="sortOrder(SORT.IsActive)"
+            class="text-uppercase small fw-semibold text-muted">
+            Status
+          </th>
 
-                <td class="text-end">
-                  <a
-                    [routerLink]="['/branches/edit', b.id]"
-                    abpPermission="POS.Branches.Edit"
-                    class="btn btn-sm btn-outline-primary">
-                    <i class="fa fa-edit me-1"></i> Edit
-                  </a>
-                </td>
-              </tr>
-            } @empty {
-              <tr>
-                <td colspan="5" class="text-center text-muted py-5">
-                  No branches found.
-                </td>
-              </tr>
-            }
-          }
-        </tbody>
-      </table>
-    </div>
+          <th nzWidth="140px" class="text-end"></th>
+        </tr>
+      </thead>
 
-    <!-- Pagination -->
-    <div
-      class="d-flex flex-wrap align-items-center justify-content-between mt-3 gap-2"
-      *ngIf="total > 0">
+      <tbody>
+        <tr *ngFor="let b of rows; trackBy: trackById">
+          <td class="text-muted">{{ b.code }}</td>
 
-      <div class="d-flex align-items-center gap-2">
-        <span class="small text-muted">Rows per page</span>
-        <select
-          class="form-select form-select-sm w-auto"
-          [value]="pageSize"
-          (change)="onPageSizeChange($any($event.target).value)">
-          <option [value]="10">10</option>
-          <option [value]="20">20</option>
-          <option [value]="50">50</option>
-          <option [value]="100">100</option>
-        </select>
+          <td class="fw-semibold cell-ellipsis" [title]="b.name">
+            {{ b.name }}
+          </td>
+
+          <td class="text-end">
+            <span class="badge rounded-pill bg-secondary text-dark px-3">
+              {{ b.vatPerc | number:'1.0-2' }}%
+            </span>
+          </td>
+
+          <td>
+            <span
+              class="badge rounded-pill px-3"
+              [class.bg-success]="b.isActive"
+              [class.text-light]="b.isActive"
+              [class.bg-secondary]="!b.isActive">
+              {{ b.isActive ? 'Active' : 'Inactive' }}
+            </span>
+          </td>
+
+          <td class="text-end">
+            <a
+              [routerLink]="['/branches/edit', b.id]"
+              abpPermission="POS.Branches.Edit"
+              class="btn btn-outline-secondary btn-xs">
+              <i class="fa fa-edit me-1"></i> Edit
+            </a>
+          </td>
+        </tr>
+      </tbody>
+    </nz-table>
+
+    <ng-template #noResultTpl>
+      <div class="text-center text-muted py-4">
+        No branches found.
       </div>
-
-      <div class="small text-muted">
-        {{ visibleFrom }}–{{ visibleTo }} of {{ total }}
-      </div>
-
-      <div class="d-flex align-items-center gap-2">
-        <button
-          class="btn btn-sm btn-outline-secondary"
-          (click)="changePage(-1)"
-          [disabled]="pageIndex === 0 || loading">
-          ‹ Prev
-        </button>
-
-        <span class="small">Page {{ pageIndex + 1 }}</span>
-
-        <button
-          class="btn btn-sm btn-outline-secondary"
-          (click)="changePage(1)"
-          [disabled]="visibleTo >= total || loading">
-          Next ›
-        </button>
-      </div>
-    </div>
+    </ng-template>
   </div>
 </div>

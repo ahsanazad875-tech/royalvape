@@ -1,146 +1,133 @@
-<div class="card product-card">
+<div class="card product-report-card">
+
+  <!-- HEADER -->
+  <div class="card-header d-flex align-items-start">
+    <div>
+      <h2 class="mb-1">Products</h2>
+      <p class="mb-0 text-muted">Manage products and view key details</p>
+    </div>
+
+    <div class="ms-auto" *ngIf="isAdmin">
+      <button abpPermission="POS.Products.Create" class="btn btn-primary btn-sm" [routerLink]="['/products/edit']">
+        <i class="fa fa-plus me-1"></i> Create
+      </button>
+    </div>
+  </div>
+
   <div class="card-body">
 
-    <!-- Header Row -->
-    <div class="d-flex align-items-center mb-3 product-header">
-      <button
-        *ngIf="isAdmin"
-        abpPermission="POS.Products.Create"
-        class="btn btn-primary btn-add-product"
-        [routerLink]="['/products/edit']"
-      >
-        <i class="fa fa-plus me-1"></i> Create Product
-      </button>
+    <!-- FILTERS -->
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between" role="button"
+        (click)="filtersCollapsed = !filtersCollapsed">
+        <span class="fw-semibold">Filters</span>
+        <span>{{ filtersCollapsed ? 'Show' : 'Hide' }}</span>
+      </div>
 
-      <div class="ms-auto small text-muted product-total">
-        Total: <strong>{{ total }}</strong>
+      <div class="card-body" *ngIf="!filtersCollapsed">
+        <form [formGroup]="form" (ngSubmit)="search(true)">
+          <div class="row g-3 align-items-end">
+
+            <!-- Product Type -->
+            <div class="col-12 col-md-6 col-lg-3">
+              <label class="form-label">Product Type</label>
+              <nz-select class="w-100" nzAllowClear nzShowSearch nzPlaceHolder="All" formControlName="productTypeId"
+                (ngModelChange)="onProductTypeChanged()">
+                <nz-option nzValue="" nzLabel="All"></nz-option>
+                <nz-option *ngFor="let t of productTypeOptions" [nzValue]="t.id" [nzLabel]="t.type ?? t.name">
+                </nz-option>
+              </nz-select>
+            </div>
+
+            <!-- Product -->
+            <div class="col-12 col-md-6 col-lg-3">
+              <label class="form-label">Product</label>
+              <nz-select class="w-100" nzShowSearch nzServerSearch nzAllowClear nzPlaceHolder="All"
+                formControlName="productId" (nzOnSearch)="onProductSearch($event)" [nzLoading]="productLookupLoading">
+                <nz-option nzValue="" nzLabel="All"></nz-option>
+                <nz-option *ngFor="let p of productOptions" [nzValue]="p.id" [nzLabel]="p.productNo + ' ' + p.productName">
+                </nz-option>
+              </nz-select>
+            </div>
+
+            <!-- Search -->
+            <div class="col-12 col-md-6 col-lg-3">
+              <label class="form-label">Search</label>
+              <input type="text" class="form-control form-control-sm" placeholder="Product no / name..."
+                formControlName="filter" />
+            </div>
+
+            <!-- COLUMN SELECT -->
+            <div class="col-12 col-md-6 col-lg-3">
+              <label class="form-label">Columns</label>
+
+              <button type="button" nz-button nz-dropdown nzType="default" nzTrigger="click"
+                [nzDropdownMenu]="columnsMenu" class="w-100 d-flex justify-content-between align-items-center">
+                <span>Columns ({{ visibleColumns.length }})</span>
+                <i nz-icon nzType="down"></i>
+              </button>
+
+              <nz-dropdown-menu #columnsMenu="nzDropdownMenu" [nzClickHide]="false">
+                <ul nz-menu nzSelectable="false" class="p-2 column-dropdown">
+                  <li nz-menu-item *ngFor="let col of columns" class="d-flex align-items-center gap-2">
+                    <input type="checkbox" class="form-check-input me-2" [checked]="col.visible"
+                      (click)="$event.stopPropagation()"
+                      (change)="toggleColumn(col.key, $any($event.target).checked)" />
+                    <span>{{ col.label }}</span>
+                  </li>
+                </ul>
+              </nz-dropdown-menu>
+            </div>
+
+            <!-- ACTIONS -->
+            <div class="col-12 d-flex justify-content-end gap-2">
+              <button type="button" class="btn btn-outline-secondary btn-sm" (click)="reset()" [disabled]="loading">
+                Reset
+              </button>
+
+              <button type="submit" class="btn btn-primary btn-sm" [disabled]="loading">
+                Search
+              </button>
+            </div>
+
+          </div>
+        </form>
       </div>
     </div>
 
-    <!-- Table -->
-    <div class="table-responsive product-table-container">
-      <table class="table table-striped align-middle product-table">
-        <thead>
-          <tr>
-            <th class="col-name">Name</th>
-            <th class="col-type">Type</th>
-            <th class="col-uom">UoM</th>
-            <th class="col-created-date">Created Date</th>
-            <th class="col-created-by">Created By</th>
-            <th class="col-buy-price">Buying Price</th>
-            <th class="col-sell-price">Selling Price</th>
-            <th class="col-updated-date">Updated Date</th>
-            <th class="col-updated-by">Updated By</th>
-            <th class="col-actions" *ngIf="isAdmin"></th>
-          </tr>
-        </thead>
+    <!-- TABLE -->
+    <nz-table [nzData]="items" [nzLoading]="loading" [nzFrontPagination]="false" [nzTotal]="totalCount"
+      [nzPageIndex]="pageIndex" [nzPageSize]="pageSize" nzTableLayout="fixed"
+      (nzQueryParams)="onQueryParamsChange($event)">
 
-        <tbody>
-          <!-- Loading -->
-          <tr *ngIf="loading">
-            <td colspan="10" class="text-center py-4 loading-row">
-              <span class="spinner-border spinner-border-sm me-2"></span>
-              Loading…
-            </td>
-          </tr>
+      <thead>
+        <tr>
+          <th *ngFor="let col of visibleColumns" [nzWidth]="col.width" [nzSortFn]="col.sortable"
+            [nzSortOrder]="col.sortKey ? sortOrder(col.sortKey) : null" [nzColumnKey]="col.sortKey || null">
+            {{ col.label }}
+          </th>
+        </tr>
+      </thead>
 
-          <!-- No Data -->
-          <tr *ngIf="!loading && items.length === 0">
-            <td colspan="10" class="text-center text-muted py-4 no-data-row">
-              No products found.
-            </td>
-          </tr>
+      <tbody>
+        <tr *ngFor="let p of items; trackBy: trackById">
+          <td *ngIf="columns[0].visible">{{ p.productNo + ' ' + p.productName }}</td>
+          <td *ngIf="columns[1].visible">{{ p.productTypeName }}</td>
+          <td *ngIf="columns[2].visible">{{ UoMEnumMap[p.uoM] }}</td>
+          <td *ngIf="columns[3].visible" class="text-end">{{ p.buyingUnitPrice }}</td>
+          <td *ngIf="columns[4].visible" class="text-end">{{ p.sellingUnitPrice }}</td>
+          <td *ngIf="columns[5].visible">{{ p.creationTime | date:'MMM d, y, h:mm a' }}</td>
+          <td *ngIf="columns[6].visible">{{ p.creatorName }}</td>
+          <td *ngIf="columns[7].visible">{{ p.lastModificationTime | date:'MMM d, y, h:mm a' }}</td>
+          <td *ngIf="columns[8].visible">{{ p.modifiedBy }}</td>
+          <td *ngIf="isAdmin && columns[9].visible" class="text-end">
+            <a class="btn btn-outline-secondary btn-xs" [routerLink]="['/products/edit', p.id]">
+              <i class="fa fa-edit"></i>
+            </a>
+          </td>
+        </tr>
+      </tbody>
+    </nz-table>
 
-          <!-- Data Rows -->
-          <tr *ngFor="let p of items; trackBy: trackById" class="product-row">
-            <td class="product-name-cell">
-              <img
-                class="product-thumbnail me-2"
-                *ngIf="imgSrc(p) as src; else prodIcon"
-                [src]="src"
-                width="36"
-                height="36"
-                loading="lazy"
-                [alt]="p.productName || 'Product'"
-              />
-              {{ p.productNo + ' ' + p.productName }}
-            </td>
-            <td>{{ p.productTypeName }}</td>
-            <td>{{ UoMEnumMap[p.uoM] ?? p.uoM }}</td>
-            <td>{{ p.creationTime | date:'dd MMM yyyy HH:mm' }}</td>
-            <td>{{ p.creatorName }}</td>
-            <td>{{ p.buyingUnitPrice }}</td>
-            <td>{{ p.sellingUnitPrice }}</td>
-            <td>{{ p.lastModificationTime | date:'dd MMM yyyy HH:mm' }}</td>
-            <td>{{ p.modifiedBy }}</td>
-
-            <td class="text-end product-actions" *ngIf="isAdmin">
-              <a
-                class="btn btn-sm btn-outline-secondary product-edit-btn"
-                abpPermission="POS.Products.Edit"
-                [routerLink]="['/products/edit', p.id]"
-              >
-                <i class="fa fa-edit"></i>
-              </a>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Fallback Icon -->
-    <ng-template #prodIcon>
-      <span class="product-placeholder-icon me-2">
-        <i class="fa fa-box"></i>
-      </span>
-    </ng-template>
-
-    <!-- Pagination -->
-    <div
-      class="d-flex flex-wrap align-items-center justify-content-between mt-3 gap-2 pagination-container"
-      *ngIf="total > 0"
-    >
-      <!-- Rows Per Page -->
-      <div class="d-flex align-items-center gap-2 pagination-rows">
-        <span class="small text-muted">Rows per page</span>
-
-        <select
-          class="form-select form-select-sm w-auto pagination-select"
-          [value]="pageSize"
-          (change)="onPageSizeChange($any($event.target).value)"
-        >
-          <option [value]="10">10</option>
-          <option [value]="20">20</option>
-          <option [value]="50">50</option>
-          <option [value]="100">100</option>
-        </select>
-      </div>
-
-      <!-- Count -->
-      <div class="small text-muted pagination-count">
-        {{ visibleFrom }}–{{ visibleTo }} of {{ total }}
-      </div>
-
-      <!-- Page Navigation -->
-      <div class="d-flex align-items-center gap-2 pagination-buttons">
-        <button
-          class="btn btn-sm btn-outline-secondary pagination-btn"
-          (click)="changePage(-1)"
-          [disabled]="pageIndex === 0 || loading"
-        >
-          ‹ Prev
-        </button>
-
-        <span class="small pagination-page">Page {{ pageIndex + 1 }}</span>
-
-        <button
-          class="btn btn-sm btn-outline-secondary pagination-btn"
-          (click)="changePage(1)"
-          [disabled]="visibleTo >= total || loading"
-        >
-          Next ›
-        </button>
-      </div>
-    </div>
   </div>
 </div>

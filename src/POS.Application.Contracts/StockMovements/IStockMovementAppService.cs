@@ -23,8 +23,8 @@ namespace POS.StockMovements
 
         // Reports
         Task<PagedResultDto<ProductMovementDto>> GetProductMovementsAsync(ProductMovementFlatRequestDto input);
-        Task<List<StockReportDto>> GetStockReportAsync(Guid? branchId = null, Guid? productId = null);
-
+        Task<PagedResultDto<StockReportDto>> GetStockReportAsync(ProductStockListRequestDto input);
+        Task<PagedResultDto<ProductStockListItemDto>> GetProductStockListAsync(ProductStockListRequestDto input);
         // On-hand helpers (for cart)
         Task<Dictionary<Guid, decimal>> GetOnHandMapAsync(List<Guid> productIds, Guid? branchId = null);
         Task<List<OnHandItemDto>> GetOnHandListAsync(List<Guid> productIds, Guid? branchId = null);

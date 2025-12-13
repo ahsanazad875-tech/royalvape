@@ -1,4 +1,4 @@
-import type { CreateUpdateProductDto, ProductDto } from './models';
+import type { CreateUpdateProductDto, ProductDto, ProductListRequestDto } from './models';
 import { RestService, Rest } from '@abp/ng.core';
 import type { PagedAndSortedResultRequestDto, PagedResultDto } from '@abp/ng.core';
 import { Injectable } from '@angular/core';
@@ -40,6 +40,15 @@ export class ProductService {
       method: 'GET',
       url: '/api/app/product',
       params: { sorting: input.sorting, skipCount: input.skipCount, maxResultCount: input.maxResultCount },
+    },
+    { apiName: this.apiName,...config });
+  
+
+  getProductList = (input: ProductListRequestDto, config?: Partial<Rest.Config>) =>
+    this.restService.request<any, PagedResultDto<ProductDto>>({
+      method: 'GET',
+      url: '/api/app/product/product-list',
+      params: { productId: input.productId, productTypeId: input.productTypeId, filter: input.filter, sorting: input.sorting, skipCount: input.skipCount, maxResultCount: input.maxResultCount },
     },
     { apiName: this.apiName,...config });
   
