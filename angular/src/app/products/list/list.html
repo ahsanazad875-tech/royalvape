@@ -1,34 +1,27 @@
 <div class="card product-report-card">
-  <div class="card-header product-report-header">
+
+  <!-- HEADER -->
+  <div class="card-header d-flex align-items-start">
     <div>
-      <h2 class="product-report-title mb-1">Products</h2>
-      <p class="product-report-subtitle mb-0">
-        Manage products and view key details
-      </p>
+      <h2 class="mb-1">Products</h2>
+      <p class="mb-0 text-muted">Manage products and view key details</p>
     </div>
 
     <div class="ms-auto" *ngIf="isAdmin">
-      <button
-        abpPermission="POS.Products.Create"
-        class="btn btn-primary btn-sm"
-        [routerLink]="['/products/edit']">
+      <button abpPermission="POS.Products.Create" class="btn btn-primary btn-sm" [routerLink]="['/products/edit']">
         <i class="fa fa-plus me-1"></i> Create
       </button>
     </div>
   </div>
 
-  <div class="card-body product-report-body">
+  <div class="card-body">
 
-    <!-- Filters -->
-    <div class="card product-report-filters mb-3">
-      <div
-        class="card-header product-report-filters__header"
-        role="button"
+    <!-- FILTERS -->
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between" role="button"
         (click)="filtersCollapsed = !filtersCollapsed">
         <span class="fw-semibold">Filters</span>
-        <span class="product-report-filters__toggle">
-          {{ filtersCollapsed ? 'Show' : 'Hide' }}
-        </span>
+        <span>{{ filtersCollapsed ? 'Show' : 'Hide' }}</span>
       </div>
 
       <div class="card-body" *ngIf="!filtersCollapsed">
@@ -38,70 +31,63 @@
             <!-- Product Type -->
             <div class="col-12 col-md-6 col-lg-3">
               <label class="form-label">Product Type</label>
-              <nz-select
-                class="w-100"
-                nzShowSearch
-                nzAllowClear
-                nzPlaceHolder="All"
-                formControlName="productTypeId"
+              <nz-select class="w-100" nzAllowClear nzShowSearch nzPlaceHolder="All" formControlName="productTypeId"
                 (ngModelChange)="onProductTypeChanged()">
                 <nz-option nzValue="" nzLabel="All"></nz-option>
-                <nz-option *ngFor="let t of productTypeOptions"
-                  [nzValue]="t.id"
-                  [nzLabel]="t.type ?? t.name">
+                <nz-option *ngFor="let t of productTypeOptions" [nzValue]="t.id" [nzLabel]="t.type ?? t.name">
                 </nz-option>
               </nz-select>
             </div>
 
             <!-- Product -->
-            <div class="col-12 col-md-6 col-lg-4">
+            <div class="col-12 col-md-6 col-lg-3">
               <label class="form-label">Product</label>
-              <nz-select
-                class="w-100"
-                nzShowSearch
-                nzServerSearch
-                nzAllowClear
-                nzPlaceHolder="All"
-                formControlName="productId"
-                (nzOnSearch)="onProductSearch($event)"
-                [nzLoading]="productLookupLoading">
+              <nz-select class="w-100" nzShowSearch nzServerSearch nzAllowClear nzPlaceHolder="All"
+                formControlName="productId" (nzOnSearch)="onProductSearch($event)" [nzLoading]="productLookupLoading">
                 <nz-option nzValue="" nzLabel="All"></nz-option>
-                <nz-option *ngFor="let p of productOptions"
-                  [nzValue]="p.id"
-                  [nzLabel]="(p.productName ?? '(unnamed)')">
+                <nz-option *ngFor="let p of productOptions" [nzValue]="p.id" [nzLabel]="p.productNo + ' ' + p.productName">
                 </nz-option>
               </nz-select>
             </div>
 
-            <!-- Search text -->
+            <!-- Search -->
             <div class="col-12 col-md-6 col-lg-3">
-              <label class="form-label" for="filter">Search</label>
-              <input
-                id="filter"
-                type="text"
-                class="form-control form-control-sm"
-                placeholder="Product no / name..."
+              <label class="form-label">Search</label>
+              <input type="text" class="form-control form-control-sm" placeholder="Product no / name..."
                 formControlName="filter" />
             </div>
 
-            <!-- Actions -->
-            <div class="col-12 col-lg-2 ms-lg-auto">
-              <div class="product-report-actions">
-                <button
-                  type="button"
-                  class="btn btn-outline-secondary btn-sm"
-                  (click)="reset()"
-                  [disabled]="loading">
-                  Reset
-                </button>
+            <!-- COLUMN SELECT -->
+            <div class="col-12 col-md-6 col-lg-3">
+              <label class="form-label">Columns</label>
 
-                <button
-                  type="submit"
-                  class="btn btn-primary btn-sm"
-                  [disabled]="loading">
-                  Search
-                </button>
-              </div>
+              <button type="button" nz-button nz-dropdown nzType="default" nzTrigger="click"
+                [nzDropdownMenu]="columnsMenu" class="w-100 d-flex justify-content-between align-items-center">
+                <span>Columns ({{ visibleColumns.length }})</span>
+                <i nz-icon nzType="down"></i>
+              </button>
+
+              <nz-dropdown-menu #columnsMenu="nzDropdownMenu" [nzClickHide]="false">
+                <ul nz-menu nzSelectable="false" class="p-2 column-dropdown">
+                  <li nz-menu-item *ngFor="let col of columns" class="d-flex align-items-center gap-2">
+                    <input type="checkbox" class="form-check-input me-2" [checked]="col.visible"
+                      (click)="$event.stopPropagation()"
+                      (change)="toggleColumn(col.key, $any($event.target).checked)" />
+                    <span>{{ col.label }}</span>
+                  </li>
+                </ul>
+              </nz-dropdown-menu>
+            </div>
+
+            <!-- ACTIONS -->
+            <div class="col-12 d-flex justify-content-end gap-2">
+              <button type="button" class="btn btn-outline-secondary btn-sm" (click)="reset()" [disabled]="loading">
+                Reset
+              </button>
+
+              <button type="submit" class="btn btn-primary btn-sm" [disabled]="loading">
+                Search
+              </button>
             </div>
 
           </div>
@@ -109,122 +95,39 @@
       </div>
     </div>
 
-    <!-- Table -->
-    <div class="product-report-table-wrap">
-      <nz-table
-        class="product-report-table"
-        [nzData]="items"
-        [nzLoading]="loading"
-        [nzFrontPagination]="false"
-        [nzTotal]="totalCount"
-        [nzPageIndex]="pageIndex"
-        [nzPageSize]="pageSize"
-        [nzShowSizeChanger]="true"
-        [nzPageSizeOptions]="[10, 20, 50, 100]"
-        nzTableLayout="fixed"
-        (nzQueryParams)="onQueryParamsChange($event)">
+    <!-- TABLE -->
+    <nz-table [nzData]="items" [nzLoading]="loading" [nzFrontPagination]="false" [nzTotal]="totalCount"
+      [nzPageIndex]="pageIndex" [nzPageSize]="pageSize" nzTableLayout="fixed"
+      (nzQueryParams)="onQueryParamsChange($event)">
 
-        <thead>
-          <tr>
-            <th
-              nzWidth="300px"
-              [nzSortFn]="true"
-              [nzSortOrder]="sortOrder(SORT.ProductName)"
-              nzColumnKey="{{ SORT.ProductName }}">
-              Product
-            </th>
+      <thead>
+        <tr>
+          <th *ngFor="let col of visibleColumns" [nzWidth]="col.width" [nzSortFn]="col.sortable"
+            [nzSortOrder]="col.sortKey ? sortOrder(col.sortKey) : null" [nzColumnKey]="col.sortKey || null">
+            {{ col.label }}
+          </th>
+        </tr>
+      </thead>
 
-            <th
-              nzWidth="100px"
-              [nzSortFn]="true"
-              [nzSortOrder]="sortOrder(SORT.ProductType)"
-              nzColumnKey="{{ SORT.ProductType }}">
-              Type
-            </th>
-
-            <th
-              nzWidth="80px"
-              [nzSortFn]="true"
-              [nzSortOrder]="sortOrder(SORT.UoM)"
-              nzColumnKey="{{ SORT.UoM }}">
-              UoM
-            </th>
-
-            <th nzWidth="100px" class="text-end">Buying</th>
-            <th nzWidth="100px" class="text-end">Selling</th>
-
-            <th
-              nzWidth="120px"
-              [nzSortFn]="true"
-              [nzSortOrder]="sortOrder(SORT.CreationTime)"
-              nzColumnKey="{{ SORT.CreationTime }}">
-              Created
-            </th>
-
-            <th nzWidth="120px">Created By</th>
-
-            <th
-              nzWidth="120px"
-              [nzSortFn]="true"
-              [nzSortOrder]="sortOrder(SORT.LastModificationTime)"
-              nzColumnKey="{{ SORT.LastModificationTime }}">
-              Updated
-            </th>
-
-            <th nzWidth="120px">Updated By</th>
-
-            <th nzWidth="50px" *ngIf="isAdmin"></th>
-          </tr>
-        </thead>
-
-        <tbody>
-          <tr *ngFor="let p of items; trackBy: trackById">
-
-            <td class="cell-ellipsis">
-              <div class="d-flex align-items-center gap-2">
-                <img
-                  *ngIf="imgSrc(p) as src; else prodIcon"
-                  [src]="src"
-                  class="product-thumb border rounded"
-                  loading="lazy"
-                  [alt]="p.productName || 'Product'" />
-                <span class="cell-ellipsis" [title]="p.productName">
-                  {{ (p.productNo ? (p.productNo + ' ') : '') + (p.productName || '') }}
-                </span>
-              </div>
-            </td>
-
-            <td class="cell-ellipsis" [title]="p.productTypeName">{{ p.productTypeName }}</td>
-            <td>{{ UoMEnumMap[p.uoM] ?? p.uoM }}</td>
-
-            <td class="text-end">{{ p.buyingUnitPrice }}</td>
-            <td class="text-end">{{ p.sellingUnitPrice }}</td>
-
-            <td>{{ p.creationTime | date:'MMM d, y, h:mm a' }}</td>
-            <td class="cell-ellipsis" [title]="p.creatorName">{{ p.creatorName }}</td>
-
-            <td>{{ p.lastModificationTime | date:'MMM d, y, h:mm a' }}</td>
-            <td class="cell-ellipsis" [title]="p.modifiedBy">{{ p.modifiedBy }}</td>
-
-            <td class="text-end" *ngIf="isAdmin">
-              <a
-                class="btn btn-outline-secondary btn-xs"
-                abpPermission="POS.Products.Edit"
-                [routerLink]="['/products/edit', p.id]">
-                <i class="fa fa-edit"></i>
-              </a>
-            </td>
-
-          </tr>
-        </tbody>
-      </nz-table>
-
-      <ng-template #prodIcon>
-        <span class="product-thumb-placeholder border rounded bg-light text-muted d-inline-flex align-items-center justify-content-center">
-          <i class="fa fa-box"></i>
-        </span>
-      </ng-template>
-    </div>
+      <tbody>
+        <tr *ngFor="let p of items; trackBy: trackById">
+          <td *ngIf="columns[0].visible">{{ p.productNo + ' ' + p.productName }}</td>
+          <td *ngIf="columns[1].visible">{{ p.productTypeName }}</td>
+          <td *ngIf="columns[2].visible">{{ UoMEnumMap[p.uoM] }}</td>
+          <td *ngIf="columns[3].visible" class="text-end">{{ p.buyingUnitPrice }}</td>
+          <td *ngIf="columns[4].visible" class="text-end">{{ p.sellingUnitPrice }}</td>
+          <td *ngIf="columns[5].visible">{{ p.creationTime | date:'MMM d, y, h:mm a' }}</td>
+          <td *ngIf="columns[6].visible">{{ p.creatorName }}</td>
+          <td *ngIf="columns[7].visible">{{ p.lastModificationTime | date:'MMM d, y, h:mm a' }}</td>
+          <td *ngIf="columns[8].visible">{{ p.modifiedBy }}</td>
+          <td *ngIf="isAdmin && columns[9].visible" class="text-end">
+            <a class="btn btn-outline-secondary btn-xs" [routerLink]="['/products/edit', p.id]">
+              <i class="fa fa-edit"></i>
+            </a>
+          </td>
+        </tr>
+      </tbody>
+    </nz-table>
 
   </div>
 </div>

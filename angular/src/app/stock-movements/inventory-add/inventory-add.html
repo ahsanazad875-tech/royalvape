@@ -166,7 +166,7 @@
                     <nz-select style="width: 100%" nzSize="small" nzShowSearch nzAllowClear
                       nzPlaceHolder="Select product" [(ngModel)]="row.productId" name="product-{{ i }}"
                       (ngModelChange)="onProductChange(i)" required>
-                      <nz-option *ngFor="let p of products" [nzValue]="p.id" [nzLabel]="p.productName"></nz-option>
+                      <nz-option *ngFor="let p of products" [nzValue]="p.id" [nzLabel]="p.productNo + ' ' + p.productName"></nz-option>
                     </nz-select>
                   </td>
 

@@ -2,7 +2,7 @@
   <div class="card-header stock-report-header">
     <div>
       <h2 class="stock-report-title mb-1">Stock Report</h2>
-      <p class="stock-report-subtitle mb-0">
+      <p class="mb-0 text-muted">
         Snapshot of on-hand stock by branch and product
       </p>
     </div>
@@ -37,7 +37,7 @@
               <nz-select class="w-100" nzShowSearch nzAllowClear nzPlaceHolder="All" formControlName="productId">
                 <nz-option nzValue="" nzLabel="All"></nz-option>
                 <nz-option *ngFor="let p of products" [nzValue]="p.id"
-                  [nzLabel]="(p.productName ?? p.name ?? '(unnamed)')"></nz-option>
+                  [nzLabel]="p.productNo + ' ' + p.productName"></nz-option>
               </nz-select>
             </div>
 

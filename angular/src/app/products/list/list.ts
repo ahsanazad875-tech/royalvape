@@ -9,8 +9,14 @@ import { environment } from 'src/environments/environment';
 import { NzTableModule, NzTableQueryParams } from 'ng-zorro-antd/table';
 import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzInputModule } from 'ng-zorro-antd/input';
+import { NzDropDownModule } from 'ng-zorro-antd/dropdown';
 
-import { ProductDto, ProductListRequestDto, ProductService, UoMEnum } from 'src/app/proxy/products';
+import {
+  ProductDto,
+  ProductListRequestDto,
+  ProductService,
+  UoMEnum,
+} from 'src/app/proxy/products';
 import { ProductTypeDto, ProductTypeService } from 'src/app/proxy/product-types';
 
 type NzSortOrder = 'ascend' | 'descend' | null;
@@ -21,10 +27,16 @@ const SORT = {
   UoM: 'UoM',
   CreationTime: 'CreationTime',
   LastModificationTime: 'LastModificationTime',
-  // If you want these sortable, your backend must accept navigation sorting:
-  Creator: 'Creator.UserName',
-  LastModifier: 'LastModifier.UserName',
 } as const;
+
+interface ColumnDef {
+  key: string;
+  label: string;
+  visible: boolean;
+  width: string;
+  sortable?: boolean;
+  sortKey?: string;
+}
 
 @Component({
   selector: 'app-products-list',
@@ -36,38 +48,64 @@ const SORT = {
     NzTableModule,
     NzSelectModule,
     NzInputModule,
+    NzDropDownModule
   ],
   templateUrl: './list.html',
-  styleUrl: './list.scss',
+  styleUrls: ['./list.scss'],
 })
 export class ListComponent implements OnInit {
   readonly SORT = SORT;
 
   form: FormGroup;
-
   items: ProductDto[] = [];
   totalCount = 0;
-
   loading = false;
   isAdmin = false;
-
   filtersCollapsed = false;
 
-  pageIndex = 1; // nz-table is 1-based
+  pageIndex = 1;
   pageSize = 20;
 
   private currentSortKey: string | null = SORT.ProductName;
   private currentSortOrder: NzSortOrder = 'ascend';
 
-  // lookups
+  private ignoreQueryParams = false; // ✅ prevent backend call on column toggle
+
   productTypeOptions: ProductTypeDto[] = [];
   productOptions: ProductDto[] = [];
   productLookupLoading = false;
 
-  public UoMEnumMap = UoMEnum as any;
-
+  UoMEnumMap = UoMEnum as any;
   apiBase = ((environment as any)?.apis?.default?.url || '').replace(/\/+$/, '');
 
+  // ==========================
+  // COLUMN CONFIG
+  // ==========================
+  columns: ColumnDef[] = [
+    { key: 'product', label: 'Product', visible: true, width: '250px', sortable: true, sortKey: SORT.ProductName },
+    { key: 'type', label: 'Type', visible: true, width: '80px', sortable: true, sortKey: SORT.ProductType },
+    { key: 'uom', label: 'UoM', visible: true, width: '80px', sortable: true, sortKey: SORT.UoM },
+    { key: 'buying', label: 'Buying', visible: true, width: '80px' },
+    { key: 'selling', label: 'Selling', visible: true, width: '80px' },
+    { key: 'created', label: 'Created', visible: true, width: '150px', sortable: true, sortKey: SORT.CreationTime },
+    { key: 'createdBy', label: 'Created By', visible: true, width: '120px' },
+    { key: 'updated', label: 'Updated', visible: false, width: '150px', sortable: true, sortKey: SORT.LastModificationTime },
+    { key: 'updatedBy', label: 'Updated By', visible: false, width: '120px' },
+  ];
+
+  
+  get visibleColumns(): ColumnDef[] {
+    return this.columns.filter(c => c.visible);
+  }
+  
+  get selectedColumnKeys(): string[] {
+    return this.columns.filter(c => c.visible).map(c => c.key);
+  }
+  
+  set selectedColumnKeys(keys: string[]) {
+    this.columns.forEach(c => (c.visible = keys.includes(c.key)));
+  }
+  
   constructor(
     private fb: FormBuilder,
     private productService: ProductService,
@@ -80,38 +118,42 @@ export class ListComponent implements OnInit {
       productId: [''],
     });
   }
-
+  
   ngOnInit(): void {
     const user = this.config.getOne('currentUser') as any;
-    const roles: string[] = user?.roles || [];
-    this.isAdmin = roles.some(r => (r || '').toLowerCase() === 'admin');
-
+    this.isAdmin = (user?.roles || []).some((r: string) => (r || '').toLowerCase() === 'admin');
+    if(this.isAdmin) {
+      this.columns.push({
+        key: 'actions',
+        label: 'Actions',
+        visible: true,
+        width: '50px'
+      });
+    }
+    
     this.loadProductTypes();
-    this.searchProductsLookup(''); // initial dropdown list
-    // first load happens via explicit search() or initial load here:
+    this.searchProductsLookup('');
     this.search(true);
-  }
 
-  imgSrc(p: ProductDto): string | null {
-    const raw = (p as any)?.imageUrl as string | undefined;
-    if (!raw) return null;
-    if (/^https?:\/\//i.test(raw)) return raw;
-    const path = raw.replace(/^\/+/, '');
-    return this.apiBase ? `${this.apiBase}/${path}` : `/${path}`;
   }
-
+  
   trackById(_: number, item: ProductDto) {
     return item.id;
   }
 
-  // -----------------------------
-  // Filters
-  // -----------------------------
+  imgSrc(p: ProductDto): string | null {
+    const raw = (p as any)?.imageUrl;
+    if (!raw) return null;
+    if (/^https?:\/\//i.test(raw)) return raw;
+    return `${this.apiBase}/${raw.replace(/^\/+/, '')}`;
+  }
+
   reset(): void {
-    this.form.reset({
-      filter: '',
-      productTypeId: '',
-      productId: '',
+    this.form.reset({ filter: '', productTypeId: '', productId: '' });
+
+    // reset columns to default
+    this.columns.forEach(c => {
+      c.visible = !['updated', 'updatedBy'].includes(c.key);
     });
 
     this.pageIndex = 1;
@@ -122,13 +164,12 @@ export class ListComponent implements OnInit {
     this.search(true);
   }
 
-  search(resetPage: boolean): void {
+  search(resetPage: boolean = false): void {
     if (resetPage) this.pageIndex = 1;
     this.load();
   }
 
   onProductTypeChanged(): void {
-    // keep same behavior as your Stock Report: update dropdown options only
     this.form.patchValue({ productId: '' }, { emitEvent: false });
     this.searchProductsLookup('');
   }
@@ -137,36 +178,28 @@ export class ListComponent implements OnInit {
     this.searchProductsLookup(term);
   }
 
-  private buildSorting(): string {
-    const key = this.currentSortKey || SORT.ProductName;
-    const dir = this.currentSortOrder === 'descend' ? 'DESC' : 'ASC';
-    return `${key} ${dir}`;
+  sortOrder(key: string): NzSortOrder {
+    return this.currentSortKey === key ? this.currentSortOrder : null;
   }
 
-  private buildRequest(): ProductListRequestDto {
-    const v = this.form.value;
+  toggleColumn(key: string, visible: boolean): void {
+    const col = this.columns.find(c => c.key === key);
+    if (col) col.visible = visible;
 
-    return {
-      skipCount: (this.pageIndex - 1) * this.pageSize,
-      maxResultCount: this.pageSize,
-      sorting: this.buildSorting(),
-
-      filter: (v.filter || '').trim() ? (v.filter || '').trim() : null,
-      productTypeId: v.productTypeId ? v.productTypeId : null,
-      productId: v.productId ? v.productId : null,
-    };
+    // prevent backend call on column toggle
+    this.ignoreQueryParams = true;
   }
 
-  // -----------------------------
-  // nz-table paging/sorting
-  // -----------------------------
   onQueryParamsChange(params: NzTableQueryParams): void {
-    const { pageIndex, pageSize, sort } = params;
+    if (this.ignoreQueryParams) {
+      this.ignoreQueryParams = false;
+      return; // skip backend call
+    }
 
-    this.pageIndex = pageIndex;
-    this.pageSize = pageSize;
+    this.pageIndex = params.pageIndex;
+    this.pageSize = params.pageSize;
 
-    const active = sort.find(s => s.value !== null);
+    const active = params.sort.find(s => s.value !== null);
     if (active?.key && active.value) {
       this.currentSortKey = active.key;
       this.currentSortOrder = active.value as NzSortOrder;
@@ -175,25 +208,25 @@ export class ListComponent implements OnInit {
     this.load();
   }
 
-  sortOrder(key: string): NzSortOrder {
-    return this.currentSortKey === key ? this.currentSortOrder : null;
+  private buildRequest(): ProductListRequestDto {
+    const v = this.form.value;
+    return {
+      skipCount: (this.pageIndex - 1) * this.pageSize,
+      maxResultCount: this.pageSize,
+      sorting: `${this.currentSortKey} ${this.currentSortOrder === 'descend' ? 'DESC' : 'ASC'}`,
+      filter: v.filter?.trim() || null,
+      productTypeId: v.productTypeId || null,
+      productId: v.productId || null,
+    };
   }
 
-  // -----------------------------
-  // Data
-  // -----------------------------
   private load(): void {
-    if (this.loading) return;
     this.loading = true;
-
-    const rq = this.buildRequest();
-
-    this.productService.getProductList(rq).subscribe({
-      next: res => {
-        this.items = res.items ?? [];
-        this.totalCount = res.totalCount ?? 0;
+    this.productService.getProductList(this.buildRequest()).subscribe({
+      next: r => {
+        this.items = r.items ?? [];
+        this.totalCount = r.totalCount ?? 0;
       },
-      error: () => (this.loading = false),
       complete: () => (this.loading = false),
     });
   }
@@ -201,29 +234,24 @@ export class ListComponent implements OnInit {
   private loadProductTypes(): void {
     this.productTypeService
       .getList({ skipCount: 0, maxResultCount: 1000, sorting: 'Type ASC' } as any)
-      .subscribe({
-        next: res => (this.productTypeOptions = res.items ?? []),
-      });
+      .subscribe(r => (this.productTypeOptions = r.items ?? []));
   }
 
   private searchProductsLookup(term: string): void {
     this.productLookupLoading = true;
-
     const v = this.form.value;
 
-    const rq: ProductListRequestDto = {
-      skipCount: 0,
-      maxResultCount: 50,
-      sorting: 'ProductName ASC',
-      filter: term?.trim() ? term.trim() : null,
-      productTypeId: v.productTypeId ? v.productTypeId : null,
-      productId: null,
-    };
-
-    this.productService.getProductList(rq).subscribe({
-      next: res => (this.productOptions = res.items ?? []),
-      error: () => (this.productLookupLoading = false),
-      complete: () => (this.productLookupLoading = false),
-    });
+    this.productService
+      .getProductList({
+        skipCount: 0,
+        maxResultCount: 50,
+        sorting: 'ProductName ASC',
+        filter: term?.trim() || null,
+        productTypeId: v.productTypeId || null,
+      })
+      .subscribe({
+        next: r => (this.productOptions = r.items ?? []),
+        complete: () => (this.productLookupLoading = false),
+      });
   }
 }

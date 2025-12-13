@@ -34,6 +34,7 @@ public static class POSPermissions
         public const string Edit = Default + ".Edit";
         public const string Delete = Default + ".Delete";
         public const string AllBranches = Default + ".AllBranches";
+        public const string PhysicalInventory = Default + ".PhysicalInventory";
     }
     public static class Dashboard 
     {

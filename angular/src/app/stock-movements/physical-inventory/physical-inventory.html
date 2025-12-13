@@ -1,0 +1,119 @@
+<div class="card stock-report-card">
+  <div class="card-header stock-report-header d-flex align-items-center justify-content-between">
+    <div>
+      <h2 class="stock-report-title mb-1">Physical Inventory</h2>
+      <p class="mb-0 text-muted">Adjust on-hand stock per product
+         <span *ngIf="selectedBranch" class="fw-bold">| {{ selectedBranch.displayName }}</span>
+      </p>
+    </div>
+
+    <div class="d-flex gap-2">
+      <button class="btn btn-sm btn-success" (click)="adjustAll()">Adjust All</button>
+      <button class="btn btn-sm btn-outline-secondary" (click)="filtersCollapsed = !filtersCollapsed">
+        {{ filtersCollapsed ? 'Show Filters' : 'Hide Filters' }}
+      </button>
+    </div>
+  </div>
+
+  <div class="card-body stock-report-body">
+    <!-- Filters -->
+    <div class="card stock-report-filters mb-3" *ngIf="!filtersCollapsed">
+      <div class="card-body">
+        <form [formGroup]="form">
+          <div class="row g-3 align-items-end">
+            <div class="col-12 col-md-6 col-lg-3">
+              <label class="form-label">Branch</label>
+              <nz-select class="w-100" [nzAllowClear]="false" formControlName="branchId" nzPlaceHolder="Select Branch">
+                <nz-option *ngFor="let b of branches" [nzValue]="b.id" [nzLabel]="b.displayName"></nz-option>
+              </nz-select>
+            </div>
+            <div class="col-12 col-md-6 col-lg-3">
+              <label class="form-label">Product Type</label>
+              <nz-select class="w-100" nzAllowClear nzPlaceHolder="All" formControlName="productTypeId">
+                <nz-option nzValue="" nzLabel="All"></nz-option>
+                <nz-option *ngFor="let t of productTypes" [nzValue]="t.id" [nzLabel]="t.type"></nz-option>
+              </nz-select>
+            </div>
+            <div class="col-12 col-md-6 col-lg-3">
+              <label class="form-label">Product</label>
+              <nz-select class="w-100" nzAllowClear nzPlaceHolder="All" formControlName="productId">
+                <nz-option nzValue="" nzLabel="All"></nz-option>
+                <nz-option *ngFor="let p of products" [nzValue]="p.id"
+                  [nzLabel]="p.productNo + ' ' +p.productName"></nz-option>
+              </nz-select>
+            </div>
+            <div class="col-12 col-md-6 col-lg-3 d-flex">
+              <button (click)="loadStock(true)" class="btn btn-primary btn-sm w-100">Search</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="stock-report-table-wrap">
+      <nz-table class="stock-report-table" [nzData]="stockList" [nzLoading]="loading" [nzFrontPagination]="false"
+        [nzTotal]="totalCount" [nzPageIndex]="pageIndex" [nzPageSize]="pageSize" [nzShowSizeChanger]="true"
+        [nzPageSizeOptions]="[10, 25, 50, 100]" nzTableLayout="fixed" [nzScroll]="{ x: '1000px' }"
+        (nzQueryParams)="onQueryParamsChange($event)">
+        <thead>
+          <tr>
+            <th nzWidth="300px">Product</th>
+            <th nzWidth="120px">Type</th>
+            <th nzWidth="100px" class="text-end">On Hand</th>
+            <th nzWidth="100px" class="text-end">Variance</th>
+            <th nzWidth="100px" class="text-end">Enter Qty</th>
+            <th nzWidth="50px">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of stockList; trackBy: trackRow">
+            <td class="cell-ellipsis" [title]="item.productName">{{ item.productName }}</td>
+            <td>{{ item.productType }}</td>
+            <td class="text-end">{{ item.onHand | number:'1.0-2' }}</td>
+            <td class="text-end">{{ calculateVariance(item) | number:'1.0-2' }}</td>
+            <td class="text-end">
+              <input type="number" class="form-control form-control-sm text-end" placeholder="Enter Qty"
+                [(ngModel)]="qtyMap[item.productId]" (ngModelChange)="updateVariance(item)" />
+            </td>
+            <td>
+              <button class="btn btn-sm btn-success" (click)="adjustSingle(item)">Adjust</button>
+            </td>
+          </tr>
+        </tbody>
+      </nz-table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<nz-modal [(nzVisible)]="showAdjustmentModal" [nzTitle]="modalTitle" [nzWidth]="800" [nzFooter]="null"
+  (nzOnCancel)="cancelAdjustment()">
+  <div *nzModalContent>
+    <nz-table [nzBordered]="true" [nzSize]="'middle'" [nzData]="modalData">
+      <thead>
+        <tr>
+          <th>Product</th>
+          <th class="text-end">On Hand</th>
+          <th class="text-end">Entered</th>
+          <th class="text-end">Variance</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let item of modalData">
+          <td>{{ item.productName }}</td>
+          <td class="text-end">{{ item.onHand }}</td>
+          <td class="text-end">{{ item.entered }}</td>
+          <td class="text-end" [ngClass]="{'text-success': item.variance>0, 'text-danger': item.variance<0}">
+            {{ item.variance }}
+          </td>
+        </tr>
+      </tbody>
+    </nz-table>
+
+    <div class="d-flex justify-content-end mt-3 gap-2">
+      <button nz-button (click)="cancelAdjustment()">Cancel</button>
+      <button nz-button nzType="primary" (click)="confirmAdjustment()">Confirm</button>
+    </div>
+  </div>
+</nz-modal>

@@ -110,9 +110,9 @@ namespace POS.StockMovements
                     throw new BusinessException("BranchRequiredForAdmin");
 
                 // Admin can Purchase or Sale (no adjustments by design)
-                if (input.StockMovementType == StockMovementType.AdjustmentPlus ||
-                    input.StockMovementType == StockMovementType.AdjustmentMinus)
-                    throw new UserFriendlyException("Admins cannot adjust stock; only Purchase or Sale.");
+                //if (input.StockMovementType == StockMovementType.AdjustmentPlus ||
+                //    input.StockMovementType == StockMovementType.AdjustmentMinus)
+                //    throw new UserFriendlyException("Admins cannot adjust stock; only Purchase or Sale.");
             }
             else
             {
@@ -248,7 +248,7 @@ namespace POS.StockMovements
         }
 
         // Non-admin only by design (EnforceBranchRules will block admin adjustments)
-        [Authorize(POSPermissions.StockMovements.Create)]
+        [Authorize(POSPermissions.StockMovements.PhysicalInventory)]
         public virtual async Task<StockMovementHeaderDto> AdjustStockAsync(CreateUpdateStockMovementHeaderDto dto)
         {
             if (dto.StockMovementType != StockMovementType.AdjustmentPlus &&
@@ -296,7 +296,7 @@ namespace POS.StockMovements
                     BranchName = d.StockMovementHeader.Branch.Name,
                     StockMovementType = d.StockMovementHeader.StockMovementType,
                     ProductId = d.ProductId,
-                    ProductName = d.Product.ProductName,
+                    ProductName = d.Product.ProductNo + " " + d.Product.ProductName,
                     ProductType = d.Product.ProductType.Type,
                     QuantitySigned =
                         (d.StockMovementHeader.StockMovementType == StockMovementType.Purchase ||

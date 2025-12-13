@@ -57,6 +57,14 @@ export const APP_ROUTES: Routes = [
       import('./stock-movements/stock-movement/stock-movement').then(m => m.StockMovementComponent),
   },
   {
+    path: 'physical-inventory',
+    title: 'Physical Inventory',
+    canActivate: [authGuard, permissionGuard],
+    data: { requiredPolicy: 'POS.StockMovements.PhysicalInventory' }, // read/report permission
+    loadComponent: () =>
+      import('./stock-movements/physical-inventory/physical-inventory').then(m => m.PhysicalInventoryComponent),
+  },
+  {
     path: 'stock-report',
     title: 'Stock Report',
     canActivate: [authGuard, permissionGuard],

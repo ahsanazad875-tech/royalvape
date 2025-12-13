@@ -1,0 +1,27 @@
+.form-control-sm {
+    padding: 0.2rem 0.3rem;
+    font-size: 0.8rem;
+    border-radius: 8px;
+}
+
+/* ----- Modal Table ----- */
+.ant-modal-content table {
+  border-collapse: collapse;
+  width: 100%;
+
+  th, td {
+    border: 1px solid #e0e0e0;
+    padding: 8px 12px;
+    font-size: 0.875rem;
+  }
+
+  th {
+    background-color: #fafafa;
+    font-weight: 600;
+    text-align: left;
+  }
+
+  td.text-right {
+    text-align: right;
+  }
+}

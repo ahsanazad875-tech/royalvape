@@ -14,8 +14,19 @@ import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzCheckboxModule } from 'ng-zorro-antd/checkbox';
 import { NzTagModule } from 'ng-zorro-antd/tag';
 import { NzToolTipModule } from 'ng-zorro-antd/tooltip';
+import { NzDropDownModule } from 'ng-zorro-antd/dropdown';
+import { NzButtonModule } from 'ng-zorro-antd/button';
 
 type NzSortOrder = 'ascend' | 'descend' | null;
+
+interface ColumnDef {
+  key: string;
+  label: string;
+  visible: boolean;
+  width: string;
+  class?: string;
+  sortable?: boolean;
+}
 
 @Component({
   selector: 'app-stock-movement',
@@ -30,6 +41,8 @@ type NzSortOrder = 'ascend' | 'descend' | null;
     NzCheckboxModule,
     NzTagModule,
     NzToolTipModule,
+    NzDropDownModule,
+    NzButtonModule,
   ],
   templateUrl: './stock-movement.html',
   styleUrls: ['./stock-movement.scss'],
@@ -42,7 +55,6 @@ export class StockMovementComponent implements OnInit {
 
   filtersCollapsed = false;
 
-  // IMPORTANT: ng-zorro pageIndex is 1-based
   pageSize = signal<number>(10);
   pageIndex = signal<number>(1);
 
@@ -67,11 +79,36 @@ export class StockMovementComponent implements OnInit {
     branchId: [''],
     productId: [''],
     productTypeId: [''],
-    stockMovementType: [null as number | null], // null = All
-    dateFrom: [''], // datetime-local string
+    stockMovementType: [null as number | null],
+    dateFrom: [''],
     dateTo: [''],
     includeCancelled: [false],
   });
+
+  // ==========================
+  // COLUMN CONFIG
+  // ==========================
+columns: ColumnDef[] = [
+  { key: 'MovementDate', label: 'Date', visible: true, width: '120px', sortable: true },
+  { key: 'BranchName', label: 'Branch', visible: true, width: '100px', sortable: true },
+  { key: 'StockMovementNo', label: 'Movement', visible: false, width: '100px', sortable: true },
+  { key: 'StockMovementType', label: 'Type', visible: true, width: '110px', sortable: true },
+  { key: 'ProductName', label: 'Product', visible: true, width: '200px', sortable: true },
+  { key: 'ProductType', label: 'Product Type', visible: false, width: '100px', sortable: true },
+  { key: 'QuantitySigned', label: 'Qty (±)', visible: true, width: '80px', class: 'text-end', sortable: true },
+  { key: 'UnitPrice', label: 'Unit Price', visible: true, width: '80px', class: 'text-end', sortable: true },
+  { key: 'AmountExclVat', label: 'Amount', visible: true, width: '100px', class: 'text-end', sortable: true },
+];
+
+
+  get visibleColumns() {
+    return this.columns.filter(c => c.visible);
+  }
+
+  toggleColumn(key: string, visible: boolean) {
+    const col = this.columns.find(c => c.key === key);
+    if (col) col.visible = visible;
+  }
 
   visibleFrom = computed(() =>
     this.totalCount() === 0 ? 0 : (this.pageIndex() - 1) * this.pageSize() + 1
@@ -95,7 +132,7 @@ export class StockMovementComponent implements OnInit {
     this.isAdmin = (this.currentUser?.roles ?? []).includes('admin');
 
     this.loadLookups();
-    this.fetchPage(); // initial load
+    this.fetchPage();
   }
 
   private loadLookups(): void {
@@ -107,7 +144,6 @@ export class StockMovementComponent implements OnInit {
     }
   }
 
-  /** Submit button */
   search(): void {
     this.pageIndex.set(1);
     this.fetchPage();
@@ -128,14 +164,15 @@ export class StockMovementComponent implements OnInit {
     this.pageIndex.set(1);
     this.pageSize.set(10);
 
+    // reset columns to default visibility
+    this.columns.forEach(c => c.visible = true);
+
     this.fetchPage();
   }
 
-  /** ng-zorro table change hook (pagination + sorting) */
   onQueryParamsChange(params: NzTableQueryParams): void {
-    const nextPageIndex = params.pageIndex; // 1-based
+    const nextPageIndex = params.pageIndex;
     const nextPageSize = params.pageSize;
-
     const nextSorting = this.buildSorting(params.sort);
 
     const changed =
@@ -147,40 +184,25 @@ export class StockMovementComponent implements OnInit {
     this.pageSize.set(nextPageSize);
     this.sorting.set(nextSorting);
 
-    if (changed) {
-      this.fetchPage();
-    }
+    if (changed) this.fetchPage();
   }
 
   private buildSorting(sort: NzTableQueryParams['sort']): string {
     const active = (sort ?? []).filter(s => !!s.value);
-
-    if (!active.length) {
-      return this.defaultSorting;
-    }
-
-    // nzColumnKey should match backend sorting field names
+    if (!active.length) return this.defaultSorting;
     const parts = active.map(s => `${s.key} ${s.value === 'ascend' ? 'ASC' : 'DESC'}`);
-
     return parts.join(', ');
   }
 
   sortOrder(col: string): NzSortOrder {
-    // parse current sorting: "MovementDate DESC, StockMovementNo DESC"
-    const parts = (this.sorting() ?? '')
-      .split(',')
-      .map(x => x.trim())
-      .filter(Boolean);
-
+    const parts = (this.sorting() ?? '').split(',').map(x => x.trim()).filter(Boolean);
     const match = parts.find(p => p.toLowerCase().startsWith(col.toLowerCase() + ' '));
     if (!match) return null;
-
     return match.toLowerCase().includes(' desc') ? 'descend' : 'ascend';
   }
 
   fetchPage(): void {
     this.loading.set(true);
-
     const v = this.form.value;
 
     this.reports
@@ -192,7 +214,6 @@ export class StockMovementComponent implements OnInit {
         dateFrom: v.dateFrom || undefined,
         dateTo: v.dateTo || undefined,
         includeCancelled: !!v.includeCancelled,
-
         skipCount: (this.pageIndex() - 1) * this.pageSize(),
         maxResultCount: this.pageSize(),
         sorting: this.sorting(),
