@@ -17,6 +17,7 @@ namespace POS.StockMovement
             StockMovementDetails = new List<StockMovementDetail>();
         }
         public string? StockMovementNo { get; set; }
+        public long? StockMovementSeq { get; set; }
         public StockMovementType StockMovementType { get; set; }
         public string? BusinessPartnerName { get; set; }
         public string? Description { get; set; }

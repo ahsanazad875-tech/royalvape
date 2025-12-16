@@ -15,31 +15,17 @@
           <div class="search-toolbar">
             <div class="search-wrapper">
               <i class="fas fa-search search-icon"></i>
-              <input
-                type="text"
-                class="search-input"
-                placeholder="Search products..."
-                [(ngModel)]="search"
-                (input)="onSearchInput()"
-              />
+              <input type="text" class="search-input" placeholder="Search products..." [(ngModel)]="search"
+                (input)="onSearchInput()" />
             </div>
 
             <div class="filter-controls">
               <label class="stock-filter">
-                <input
-                  type="checkbox"
-                  [(ngModel)]="showInStockOnly"
-                  (change)="onToggleInStockOnly()"
-                />
+                <input type="checkbox" [(ngModel)]="showInStockOnly" (change)="onToggleInStockOnly()" />
                 <span>In stock only</span>
               </label>
 
-              <select
-                *ngIf="isAdmin"
-                class="branch-select"
-                [(ngModel)]="branchId"
-                (change)="onBranchChanged()"
-              >
+              <select *ngIf="isAdmin" class="branch-select" [(ngModel)]="branchId" (change)="onBranchChanged()">
                 <option *ngFor="let b of branches" [value]="b.id">
                   {{ b.name }}
                 </option>
@@ -57,27 +43,19 @@
           </div>
         </div>
 
-        <!-- Products grid (this is the backend page) -->
+        <!-- Products grid (backend page) -->
         <div class="products-grid" *ngIf="products.length">
           <div class="product-card" *ngFor="let p of products">
             <div class="product-visual">
-              <img
-                *ngIf="imgSrc(p) as src; else productIcon"
-                [src]="src"
-                [alt]="p.productName || 'Product'"
-                class="product-image"
-              />
+              <img *ngIf="imgSrc(p) as src; else productIcon" [src]="src" [alt]="p.productName || 'Product'"
+                class="product-image" />
               <ng-template #productIcon>
                 <div class="product-icon-wrapper">
                   <i [class]="iconFor(p)"></i>
                 </div>
               </ng-template>
 
-              <span
-                class="stock-badge"
-                [class.in-stock]="onHand(p) > 0"
-                [class.out-of-stock]="onHand(p) === 0"
-              >
+              <span class="stock-badge" [class.in-stock]="onHand(p) > 0" [class.out-of-stock]="onHand(p) === 0">
                 {{ onHand(p) > 0 ? onHand(p) + ' in stock' : 'Out of stock' }}
               </span>
             </div>
@@ -99,13 +77,8 @@
                 </span>
               </div>
 
-              <button
-                type="button"
-                class="btn-add-to-cart"
-                [class.added]="alreadyInCart(p)"
-                [disabled]="!loadingStock && onHand(p) <= 0"
-                (click)="addToCart(p)"
-              >
+              <button type="button" class="btn-add-to-cart" [class.added]="alreadyInCart(p)"
+                [disabled]="!loadingStock && onHand(p) <= 0" (click)="addToCart(p)">
                 <i class="fas fa-plus icon-add"></i>
                 <i class="fas fa-check icon-check"></i>
                 <span class="btn-text">
@@ -123,12 +96,8 @@
           </div>
 
           <div class="pagination-controls">
-            <button
-              type="button"
-              class="pagination-button"
-              (click)="prevPage()"
-              [disabled]="currentPage === 1 || loadingStock"
-            >
+            <button type="button" class="pagination-button" (click)="prevPage()"
+              [disabled]="currentPage === 1 || loadingStock">
               ‹ Prev
             </button>
 
@@ -136,20 +105,12 @@
               Page {{ currentPage }} / {{ totalPages }}
             </span>
 
-            <button
-              type="button"
-              class="pagination-button"
-              (click)="nextPage()"
-              [disabled]="currentPage === totalPages || loadingStock"
-            >
+            <button type="button" class="pagination-button" (click)="nextPage()"
+              [disabled]="currentPage === totalPages || loadingStock">
               Next ›
             </button>
 
-            <select
-              class="page-size-select"
-              [(ngModel)]="pageSize"
-              (ngModelChange)="setPageSize($event)"
-            >
+            <select class="page-size-select" [(ngModel)]="pageSize" (ngModelChange)="setPageSize($event)">
               <option *ngFor="let s of pageSizeOptions" [ngValue]="s">
                 {{ s }} / page
               </option>
@@ -166,7 +127,7 @@
       </div>
     </div>
 
-    <!-- RIGHT: Shopping Cart (unchanged UI; still uses id everywhere) -->
+    <!-- RIGHT: Shopping Cart -->
     <div class="cart-section">
       <div class="section-card cart-card">
         <div class="cart-header">
@@ -179,12 +140,7 @@
               </span>
             </h5>
 
-            <button
-              type="button"
-              class="btn-text-danger"
-              (click)="clear()"
-              *ngIf="lines.length"
-            >
+            <button type="button" class="btn-text-danger" (click)="clear()" *ngIf="lines.length">
               Clear
             </button>
           </div>
@@ -198,18 +154,13 @@
           </div>
 
           <div class="cart-items" *ngIf="lines.length">
-            <div
-              class="cart-item-compact"
-              *ngFor="let l of lines; trackBy: trackByLine"
-            >
+            <div class="cart-item-compact" [class.has-error]="!!l.amountError"
+              *ngFor="let l of lines; trackBy: trackByLine">
               <div class="item-row">
                 <div class="item-info">
                   <div class="item-image">
-                    <img
-                      *ngIf="imgSrc(l.product) as src; else itemIcon"
-                      [src]="src"
-                      [alt]="l.product.productName || 'Product'"
-                    />
+                    <img *ngIf="imgSrc(l.product) as src; else itemIcon" [src]="src"
+                      [alt]="l.product.productName || 'Product'" />
                     <ng-template #itemIcon>
                       <div class="item-icon">
                         <i [class]="iconFor(l.product)"></i>
@@ -223,13 +174,10 @@
                     </h6>
 
                     <div class="item-unit-price">
-                      {{ currencySymbol }}
+                      Unit: {{ currencySymbol }}
                       {{ l.unitPrice | number: '1.2-2' }}
 
-                      <span
-                        class="stock-indicator"
-                        [class.low-stock]="onHand(l.product) < 5"
-                      >
+                      <span class="stock-indicator" [class.low-stock]="onHand(l.product) < 5">
                         ({{ onHand(l.product) }} left)
                       </span>
                     </div>
@@ -238,72 +186,52 @@
 
                 <div class="item-actions">
                   <div class="quantity-control-compact">
-                    <button
-                      type="button"
-                      class="qty-btn"
-                      (click)="dec(l)"
-                      [disabled]="l.quantity <= 1"
-                    >
+                    <button type="button" class="qty-btn" (click)="dec(l)" [disabled]="l.quantity <= 1">
                       <i class="fas fa-minus"></i>
                     </button>
 
-                    <input
-                      type="number"
-                      class="qty-input"
-                      [(ngModel)]="l.quantity"
-                      (ngModelChange)="qtyChanged(l)"
-                      [min]="1"
-                      [max]="onHand(l.product)"
-                    />
+                    <input type="number" class="qty-input" [(ngModel)]="l.quantity" (ngModelChange)="qtyChanged(l)"
+                      [min]="1" [max]="onHand(l.product)" />
 
-                    <button
-                      type="button"
-                      class="qty-btn"
-                      (click)="inc(l)"
-                      [disabled]="l.quantity >= onHand(l.product)"
-                    >
+                    <button type="button" class="qty-btn" (click)="inc(l)" [disabled]="l.quantity >= onHand(l.product)">
                       <i class="fas fa-plus"></i>
                     </button>
                   </div>
 
-                  <div class="line-total-compact">
+                  <!-- Show the line amount EX VAT (what will be posted) -->
+                  <!-- <div class="line-total-compact">
                     {{ currencySymbol }}
-                    {{
-                      (l.quantity * l.unitPrice - (l.discountAmount || 0) > 0
-                        ? l.quantity * l.unitPrice - (l.discountAmount || 0)
-                        : 0) | number: '1.2-2'
-                    }}
-                  </div>
+                    {{ lineEx(l) | number: '1.2-2' }}
+                  </div> -->
 
-                  <button
-                    type="button"
-                    class="btn-remove-compact"
-                    (click)="remove(l)"
-                    title="Remove"
-                  >
+                  <button type="button" class="btn-remove-compact" (click)="remove(l)" title="Remove">
                     <i class="fas fa-times"></i>
                   </button>
                 </div>
               </div>
 
-              <div class="discount-row" *ngIf="isAdmin || l.discountAmount > 0">
-                <label class="discount-label">
-                  <i class="fas fa-tag"></i> Discount
+              <!-- Amount Ex VAT input -->
+              <div class="amount-row">
+                <label class="amount-label">
+                  <i class="fas fa-money-bill-wave"></i> Amount (Ex VAT)
                 </label>
 
-                <div class="discount-input-wrapper">
-                  <span class="discount-prefix">{{ currencySymbol }}</span>
-                  <input
-                    #discInput
-                    type="number"
-                    class="discount-input"
-                    [ngModel]="l.discountAmount"
-                    (ngModelChange)="discountChanged(l, $event, discInput)"
-                    min="0"
-                    step="0.01"
-                    placeholder="0.00"
-                  />
+                <div class="amount-right">
+                  <!-- ALWAYS calculated: qty * unitPrice -->
+                  <span class="amount-current">
+                    {{ currencySymbol }} {{ calcEx(l) | number: '1.2-2' }}
+                  </span>
+
+                  <div class="amount-input-wrapper">
+                    <input #amtInput type="number" class="amount-input" [class.input-error]="!!l.amountError"
+                      [ngModel]="l.amountExclVat" (ngModelChange)="amountExChanged(l, $event, amtInput)" min="0"
+                      step="0.01" placeholder="0.00" />
+                  </div>
                 </div>
+              </div>
+
+              <div class="amount-error" *ngIf="l.amountError">
+                {{ l.amountError }}
               </div>
             </div>
           </div>
@@ -311,12 +239,8 @@
 
         <div class="customer-panel" *ngIf="lines.length">
           <label class="customer-label">Customer name</label>
-          <input
-            type="text"
-            class="customer-input"
-            placeholder="Optional customer name..."
-            [(ngModel)]="customerName"
-          />
+          <input type="text" class="customer-input" placeholder="Optional customer name..."
+            [(ngModel)]="customerName" />
         </div>
 
         <div class="cart-summary" *ngIf="lines.length">
@@ -346,12 +270,7 @@
           </div>
         </div>
 
-        <button
-          type="button"
-          class="btn-checkout"
-          (click)="checkout()"
-          [disabled]="!lines.length"
-        >
+        <button type="button" class="btn-checkout" (click)="checkout()" [disabled]="!lines.length">
           <i class="fas fa-credit-card me-2"></i>
           Checkout
           <span class="checkout-amount" *ngIf="lines.length">

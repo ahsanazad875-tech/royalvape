@@ -132,23 +132,22 @@ namespace POS.StockMovements
 
             EnsureLines(input.Details);
 
-            var vatRate = ResolveVatRate(input.StockMovementType);
-            foreach (var d in input.Details!)
-                CalcAmounts(d, vatRate);
+            if(input.StockMovementType == StockMovementType.AdjustmentPlus ||
+               input.StockMovementType == StockMovementType.AdjustmentMinus)
+            {
+                var vatRate = ResolveVatRate(input.StockMovementType);
+                foreach (var d in input.Details!)
+                    CalcAmounts(d, vatRate);
+            }
 
             SumHeader(input);
 
             var header = ObjectMapper.Map<CreateUpdateStockMovementHeaderDto, StockMovementHeader>(input);
 
-            if (string.IsNullOrWhiteSpace(header.StockMovementNo))
-            {
-                var count = await Repository.GetCountAsync();
-                header.StockMovementNo = $"GM-{count + 1}";
-            }
-
             header.IsCancelled = false;
 
             header = await Repository.InsertAsync(header, autoSave: true);
+            header.StockMovementNo = $"GM-{header.StockMovementSeq}";
 
             foreach (var d in input.Details!)
             {
@@ -247,7 +246,6 @@ namespace POS.StockMovements
             return await CreateAsync(dto);
         }
 
-        // Non-admin only by design (EnforceBranchRules will block admin adjustments)
         [Authorize(POSPermissions.StockMovements.PhysicalInventory)]
         public virtual async Task<StockMovementHeaderDto> AdjustStockAsync(CreateUpdateStockMovementHeaderDto dto)
         {
