@@ -1,8 +1,9 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterModule } from '@angular/router';
+import { RouterModule } from '@angular/router';
 import { ConfigStateService } from '@abp/ng.core';
+import { ToasterService } from '@abp/ng.theme.shared';
 import { environment } from 'src/environments/environment';
 
 import { BranchService, BranchDto } from 'src/app/proxy/branches';
@@ -20,8 +21,18 @@ import {
 type CartLine = {
   product: ProductStockListItemDto;
   quantity: number;
+
+  // fixed (DO NOT EDIT)
   unitPrice: number;
-  discountAmount: number;
+
+  // user-entered line total (EX VAT)
+  amountExclVat?: number;
+
+  // track if user has overridden default
+  amountOverridden: boolean;
+
+  // validation feedback (set on submit only)
+  amountError?: string | null;
 };
 
 @Component({
@@ -32,7 +43,6 @@ type CartLine = {
   styleUrls: ['./cart.scss'],
 })
 export class Cart implements OnInit {
-  // current backend page
   products: ProductStockListItemDto[] = [];
   totalCount = 0;
 
@@ -47,12 +57,10 @@ export class Cart implements OnInit {
 
   customerName = '';
 
-  // pagination (BACKEND)
   pageSizeOptions = [8, 12, 24, 48];
   pageSize = 8;
   currentPage = 1;
 
-  // Currency symbol
   currencySymbol: string =
     (environment as any)?.pos?.currencySymbol ??
     (environment as any)?.currencySymbol ??
@@ -61,10 +69,8 @@ export class Cart implements OnInit {
   showInStockOnly = false;
   loadingStock = false;
 
-  // API base for images
   apiBase = ((environment as any)?.apis?.default?.url || '').replace(/\/+$/, '');
 
-  // local cache so cart items can still resolve latest onHand if they appear in any loaded page
   private productIndex = new Map<string, ProductStockListItemDto>();
 
   private typeIcons: Record<string, string> = {
@@ -87,7 +93,7 @@ export class Cart implements OnInit {
     private stockSvc: StockMovementService,
     private branchSvc: BranchService,
     private config: ConfigStateService,
-    private router: Router,
+    private toaster: ToasterService,
   ) {}
 
   ngOnInit(): void {
@@ -146,8 +152,7 @@ export class Cart implements OnInit {
 
     const req: ProductStockListRequestDto = {
       skipCount: (this.currentPage - 1) * this.pageSize,
-      maxResultCount: this.pageSize, // ✅ backend page size
-      // sorting not needed; backend is already sorting by OnHand desc
+      maxResultCount: this.pageSize,
       sorting: undefined as any,
 
       branchId: this.isAdmin ? (this.branchId as any) : undefined,
@@ -164,7 +169,6 @@ export class Cart implements OnInit {
         this.products = res.items ?? [];
         this.totalCount = Number(res.totalCount ?? 0);
 
-        // cache products for cart lookups
         for (const p of this.products) {
           this.productIndex.set(String(p.id), p);
         }
@@ -186,10 +190,8 @@ export class Cart implements OnInit {
       this.vatRate = Number(b.vatPerc / 100) || this.vatRate;
     }
 
-    // branch affects stock; safest is to clear the cart
     this.clear();
     this.productIndex.clear();
-
     this.loadProductsPage(1);
   }
 
@@ -255,49 +257,114 @@ export class Cart implements OnInit {
   trackByLine = (_: number, l: CartLine) => String(l.product.id);
 
   // =============================
-  // Cart + pricing guards
+  // Amount (Ex VAT) behavior
   // =============================
+
+  /** ALWAYS calculated (readonly display): qty * unitPrice */
+  calcEx(l: CartLine): number {
+    const q = Number(l.quantity) || 0;
+    const unit = Number(l.unitPrice) || 0;
+    return +(q * unit).toFixed(2);
+  }
+
+  /** Actual amount (Ex VAT) from input; falls back to calcEx for totals/UI convenience */
+  lineEx(l: CartLine): number {
+    const v = l.amountExclVat;
+    if (v === null || v === undefined || v === ('' as any)) return this.calcEx(l);
+    const n = Number(v);
+    if (!Number.isFinite(n)) return this.calcEx(l);
+    return +n.toFixed(2);
+  }
+
+  /** No validation while typing; validate only on checkout */
+  amountExChanged(l: CartLine, raw: any, inputEl: HTMLInputElement) {
+    l.amountOverridden = true;
+    l.amountError = null;
+
+    if (raw === '' || raw === null || raw === undefined) {
+      l.amountExclVat = undefined;
+      if (inputEl) inputEl.value = '';
+      this.lines = [...this.lines];
+      return;
+    }
+
+    const n = Number(raw);
+    l.amountExclVat = Number.isFinite(n) ? n : undefined;
+
+    this.lines = [...this.lines];
+  }
 
   private clampCartToStock() {
     this.lines.forEach(l => {
       const maxQty = this.onHand(l.product);
       if (l.quantity > maxQty) l.quantity = Math.max(0, maxQty);
-      this.clampDiscountToCost(l);
+
+      if (!l.amountOverridden) {
+        l.amountExclVat = this.calcEx(l);
+      }
     });
 
     this.lines = this.lines.filter(l => l.quantity > 0);
   }
 
-  private minUnitPrice(p: ProductStockListItemDto): number {
-    const purchase = Number((p as any).buyingUnitPrice ?? 0);
-    return Number.isFinite(purchase) && purchase > 0 ? purchase : 0;
+  private buyingUnitPrice(p: ProductStockListItemDto): number {
+    const v = Number((p as any)?.buyingUnitPrice ?? 0);
+    return Number.isFinite(v) && v > 0 ? v : 0;
   }
 
-  private getClampedDiscount(l: CartLine, candidate: number): number {
-    const qty = Number(l.quantity) || 0;
-    const unitPrice = Number(l.unitPrice) || 0;
-    const minPrice = this.minUnitPrice(l.product);
+  private validateAmountsOnSubmit(): boolean {
+    let ok = true;
 
-    if (qty <= 0 || unitPrice <= 0) return 0;
+    for (const l of this.lines) {
+      l.amountError = null;
 
-    const maxDiscountByCost = Math.max(0, qty * (unitPrice - minPrice));
-    const maxDiscountByZero = qty * unitPrice;
+      const ex = l.amountExclVat;
+      if (ex === null || ex === undefined || ex === ('' as any)) {
+        l.amountError = 'Amount (Ex VAT) is required.';
+        ok = false;
+        continue;
+      }
 
-    let maxDiscount = maxDiscountByCost || maxDiscountByZero;
-    if (maxDiscount < 0) maxDiscount = 0;
+      const exNum = Number(ex);
+      if (!Number.isFinite(exNum)) {
+        l.amountError = 'Amount (Ex VAT) must be a valid number.';
+        ok = false;
+        continue;
+      }
 
-    let v = Number(candidate);
-    if (!Number.isFinite(v) || v < 0) v = 0;
-    if (v > maxDiscount) v = maxDiscount;
+      if (exNum < 0) {
+        l.amountError = 'Amount (Ex VAT) cannot be negative.';
+        ok = false;
+        continue;
+      }
 
-    return +v.toFixed(2);
+      const buy = this.buyingUnitPrice(l.product);
+      if (buy > 0) {
+        const minAllowed = (Number(l.quantity) || 0) * buy;
+        if (exNum < minAllowed) {
+          l.amountError = `Amount is below cost. Minimum is ${this.currencySymbol} ${minAllowed.toFixed(2)}.`;
+          ok = false;
+          continue;
+        }
+      }
+    }
+
+    if (!ok) {
+      this.lines = [...this.lines];
+      const first = this.lines.find(x => !!x.amountError);
+      this.toaster.error(
+        first?.amountError || 'Please fix highlighted amounts before checkout.',
+        'Validation',
+      );
+    }
+
+    return ok;
   }
 
-  private clampDiscountToCost(l: CartLine) {
-    l.discountAmount = this.getClampedDiscount(l, Number(l.discountAmount) || 0);
-  }
+  // =============================
+  // Cart
+  // =============================
 
-  // ✅ uses id everywhere
   addToCart(p: ProductStockListItemDto) {
     const inStock = this.onHand(p);
     if (inStock <= 0) return;
@@ -310,7 +377,11 @@ export class Cart implements OnInit {
       const next = Math.min(Number(line.quantity || 0) + 1, inStock);
       if (next !== line.quantity) {
         line.quantity = next;
-        this.clampDiscountToCost(line);
+
+        if (!line.amountOverridden) {
+          line.amountExclVat = this.calcEx(line);
+        }
+
         this.lines = [...this.lines];
       }
       return;
@@ -320,10 +391,13 @@ export class Cart implements OnInit {
       product: latest,
       quantity: 1,
       unitPrice: Number((latest as any).sellingUnitPrice ?? 0),
-      discountAmount: 0,
+      amountExclVat: 0,
+      amountOverridden: false,
+      amountError: null,
     };
 
-    this.clampDiscountToCost(l);
+    l.amountExclVat = this.calcEx(l);
+
     this.lines = [...this.lines, l];
   }
 
@@ -332,7 +406,12 @@ export class Cart implements OnInit {
     const q = Number(l.quantity || 0);
     if (q < maxQty) {
       l.quantity = q + 1;
-      this.clampDiscountToCost(l);
+
+      if (!l.amountOverridden) {
+        l.amountExclVat = this.calcEx(l);
+      }
+
+      l.amountError = null;
       this.lines = [...this.lines];
     }
   }
@@ -341,7 +420,12 @@ export class Cart implements OnInit {
     const q = Number(l.quantity || 0);
     if (q > 1) {
       l.quantity = q - 1;
-      this.clampDiscountToCost(l);
+
+      if (!l.amountOverridden) {
+        l.amountExclVat = this.calcEx(l);
+      }
+
+      l.amountError = null;
       this.lines = [...this.lines];
     } else {
       this.remove(l);
@@ -360,14 +444,11 @@ export class Cart implements OnInit {
       return;
     }
 
-    this.clampDiscountToCost(l);
-    this.lines = [...this.lines];
-  }
+    if (!l.amountOverridden) {
+      l.amountExclVat = this.calcEx(l);
+    }
 
-  discountChanged(l: CartLine, raw: any, inputEl: HTMLInputElement) {
-    const clamped = this.getClampedDiscount(l, Number(raw) || 0);
-    l.discountAmount = clamped;
-    if (inputEl) inputEl.value = clamped ? clamped.toString() : '';
+    l.amountError = null;
     this.lines = [...this.lines];
   }
 
@@ -377,14 +458,17 @@ export class Cart implements OnInit {
 
   clear() {
     this.lines = [];
+    this.customerName = '';
   }
+
+  // =============================
+  // Totals (based on actual Amount Ex VAT input; falls back to calc if empty)
+  // =============================
 
   get totals() {
     const ex = this.lines.reduce((a, l) => {
-      const lineGross = Number(l.quantity) * Number(l.unitPrice);
-      const disc = Number(l.discountAmount || 0);
-      const net = Math.max(0, lineGross - disc);
-      return a + net;
+      const v = this.lineEx(l);
+      return a + (Number.isFinite(v) ? Math.max(0, v) : 0);
     }, 0);
 
     const vat = ex * this.vatRate;
@@ -393,10 +477,16 @@ export class Cart implements OnInit {
     return { ex: +ex.toFixed(2), vat: +vat.toFixed(2), inc: +inc.toFixed(2) };
   }
 
+  // =============================
+  // Checkout
+  // =============================
+
   checkout() {
     if (!this.lines.length) return;
 
-    this.lines.forEach(l => this.clampDiscountToCost(l));
+    if (!this.validateAmountsOnSubmit()) {
+      return;
+    }
 
     const header: CreateUpdateStockMovementHeaderDto = {
       stockMovementNo: '',
@@ -408,20 +498,18 @@ export class Cart implements OnInit {
       amountInclVat: this.totals.inc,
       ...(this.isAdmin && this.branchId ? { branchId: this.branchId as any } : {}),
       details: this.lines.map<CreateUpdateStockMovementDetailDto>(l => {
-        const lineGross = Number(l.quantity) * Number(l.unitPrice);
-        const disc = Number(l.discountAmount || 0);
-        const ex = Math.max(0, lineGross - disc);
+        const ex = this.lineEx(l);
 
         return {
-          productId: l.product.id as any, // ✅ id everywhere
+          productId: l.product.id as any,
           uoM: (l.product as any).uoM,
           quantity: l.quantity,
-          unitPrice: l.unitPrice,
-          discountAmount: l.discountAmount,
+          unitPrice: l.unitPrice, // fixed
+          discountAmount: 0 as any,
           amountExclVat: +ex.toFixed(2),
           amountVat: +(ex * this.vatRate).toFixed(2),
           amountInclVat: +(ex * (1 + this.vatRate)).toFixed(2),
-        };
+        } as any;
       }),
       isCancelled: false,
     } as any;
@@ -437,9 +525,20 @@ export class Cart implements OnInit {
       }
     });
 
-    this.stockSvc.create(header).subscribe(() => {
-      this.clear();
-      this.router.navigateByUrl('/stock-report');
+    this.stockSvc.create(header).subscribe({
+      next: () => {
+        // ✅ success: toast + clear + refresh products (no navigation)
+        this.toaster.success('Sale completed successfully.', 'Success');
+
+        this.clear();
+
+        // refresh stock for current page / current filters
+        this.productIndex.clear();
+        this.loadProductsPage(this.currentPage);
+      },
+      error: () => {
+        this.toaster.error('Checkout failed. Please try again.', 'Error');
+      },
     });
   }
 }

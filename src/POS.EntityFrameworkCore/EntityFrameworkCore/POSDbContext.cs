@@ -143,6 +143,8 @@ public class POSDbContext :
                 .WithMany()
                 .HasForeignKey(x => x.BranchId)
                 .OnDelete(DeleteBehavior.Restrict);
+            b.Property(x => x.StockMovementSeq)
+                .ValueGeneratedOnAdd();
             b.HasIndex(x => x.BranchId);
         });
 

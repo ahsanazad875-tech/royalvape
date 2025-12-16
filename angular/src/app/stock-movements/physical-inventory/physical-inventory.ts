@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, FormsModule } from '@angular/forms';
-import { finalize } from 'rxjs';
+import { finalize, forkJoin } from 'rxjs';
 import { NzSelectModule } from 'ng-zorro-antd/select';
 import { NzTableModule, NzTableQueryParams } from 'ng-zorro-antd/table';
 import { NzButtonModule } from 'ng-zorro-antd/button';
@@ -220,49 +220,133 @@ export class PhysicalInventoryComponent implements OnInit {
   }
 
   confirmAdjustment() {
-    if (!this.selectedBranch) return;
+  if (!this.selectedBranch) return;
 
-    if (this.modalAction === 'single' && this.currentItem) {
-      const item = this.currentItem;
-      const variance = this.calculateVariance(item);
-      const dto: CreateUpdateStockMovementHeaderDto = {
-        branchId: this.selectedBranch.id,
-        isCancelled: false,
-        stockMovementType: variance > 0 ? StockMovementType.AdjustmentPlus : StockMovementType.AdjustmentMinus,
-        details: [{ productId: item.productId, quantity: Math.abs(variance), unitPrice: item.buyingUnitPrice, discountAmount: 0 }],
-      };
-      this.stockSvc.adjustStock(dto).subscribe(() => {
-        this.notification.success('Success', 'Stock adjusted successfully.');
-        this.loadStock(false);
-      });
-    } else if (this.modalAction === 'bulk') {
-      const positives: CreateUpdateStockMovementHeaderDto = {
-        branchId: this.selectedBranch.id,
-        isCancelled: false,
-        stockMovementType: StockMovementType.AdjustmentPlus,
-        details: [],
-      };
-      const negatives: CreateUpdateStockMovementHeaderDto = {
-        branchId: this.selectedBranch.id,
-        isCancelled: false,
-        stockMovementType: StockMovementType.AdjustmentMinus,
-        details: [],
-      };
+  // Helper to create a header dto
+  const createHeader = (type: StockMovementType): CreateUpdateStockMovementHeaderDto => ({
+    branchId: this.selectedBranch!.id,
+    isCancelled: false,
+    stockMovementType: type,
+    details: [],
+  });
 
-      this.modalData.forEach(item => {
-        if (item.variance > 0) positives.details.push({ productId: item.productId, quantity: item.variance, unitPrice: item.unitPrice, discountAmount: 0 });
-        else negatives.details.push({ productId: item.productId, quantity: Math.abs(item.variance), unitPrice: item.unitPrice, discountAmount: 0 });
-      });
+  // SINGLE
+  if (this.modalAction === 'single' && this.currentItem) {
+    const item = this.currentItem;
+    const variance = this.calculateVariance(item);
 
-      if (positives.details.length) this.stockSvc.adjustStock(positives).subscribe();
-      if (negatives.details.length) this.stockSvc.adjustStock(negatives).subscribe();
-
-      this.notification.success('Success', 'Stock adjustments processed.');
-      this.loadStock(false);
+    if (variance === 0) {
+      this.notification.warning('No Variance', 'There is no variance to adjust.');
+      return;
     }
 
-    this.showAdjustmentModal = false;
+    const dto: CreateUpdateStockMovementHeaderDto = {
+      branchId: this.selectedBranch.id,
+      isCancelled: false,
+      stockMovementType:
+        variance > 0 ? StockMovementType.AdjustmentPlus : StockMovementType.AdjustmentMinus,
+      details: [
+        {
+          productId: item.productId,
+          quantity: Math.abs(variance),
+          unitPrice: item.buyingUnitPrice,
+          discountAmount: 0,
+        } as any,
+      ],
+    };
+
+    this.loading = true;
+
+    this.stockSvc
+      .adjustStock(dto)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+          this.showAdjustmentModal = false;
+        }),
+      )
+      .subscribe({
+        next: () => {
+          this.notification.success('Success', 'Stock adjusted successfully.');
+          this.loadStock(false);
+        },
+        error: (err: any) => {
+          const msg =
+            err?.error?.error?.message ||
+            err?.error?.message ||
+            err?.message ||
+            'Failed to adjust stock.';
+          this.notification.error('Error', msg);
+        },
+      });
+
+    return;
   }
+
+  // BULK
+  if (this.modalAction === 'bulk') {
+    const positives = createHeader(StockMovementType.AdjustmentPlus);
+    const negatives = createHeader(StockMovementType.AdjustmentMinus);
+
+    this.modalData.forEach(x => {
+      if (!x.variance) return;
+
+      const detail = {
+        productId: x.productId,
+        quantity: Math.abs(x.variance),
+        unitPrice: x.unitPrice,
+        discountAmount: 0,
+      } as any;
+
+      if (x.variance > 0) positives.details!.push(detail);
+      else negatives.details!.push(detail);
+    });
+
+    const requests = [];
+    if (positives.details?.length) requests.push(this.stockSvc.adjustStock(positives));
+    if (negatives.details?.length) requests.push(this.stockSvc.adjustStock(negatives));
+
+    // If user somehow opens modal but nothing to adjust
+    if (!requests.length) {
+      this.notification.warning('No Variances', 'There are no variances to adjust.');
+      this.showAdjustmentModal = false;
+      return;
+    }
+
+    this.loading = true;
+
+    forkJoin(requests)
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+          this.showAdjustmentModal = false;
+        }),
+      )
+      .subscribe({
+        next: () => {
+          // Exactly what you want:
+          // - If both + and - exist => 2 adjustments created
+          // - If only one type exists => 1 adjustment created
+          this.notification.success('Success', 'Stock adjustments processed.');
+          this.loadStock(false);
+        },
+        error: (err: any) => {
+          const msg =
+            err?.error?.error?.message ||
+            err?.error?.message ||
+            err?.message ||
+            'Failed to process stock adjustments.';
+          this.notification.error('Error', msg);
+        },
+      });
+
+    return;
+  }
+
+  // fallback
+  this.showAdjustmentModal = false;
+}
+
 
   cancelAdjustment() {
     this.showAdjustmentModal = false;
