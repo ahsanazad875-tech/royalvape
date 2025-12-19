@@ -29,8 +29,8 @@ namespace POS.StockMovements
         Task<Dictionary<Guid, decimal>> GetOnHandMapAsync(List<Guid> productIds, Guid? branchId = null);
         Task<List<OnHandItemDto>> GetOnHandListAsync(List<Guid> productIds, Guid? branchId = null);
 
-        Task<StockDashboardSummaryDto> GetDashboardSummaryAsync(Guid? branchId = null);
-        Task<List<DailySalesPointDto>> GetLast7DaysSalesAsync(Guid? branchId = null);
-        Task<List<StockByProductTypeDto>> GetStockByProductTypeAsync(Guid? branchId = null);
+        Task<StockDashboardSummaryDto> GetDashboardSummaryAsync(Guid? branchId = null, DateTime? fromDate = null, DateTime? toDate = null);
+        Task<List<DailySalesPointDto>> GetLast7DaysSalesAsync(Guid? branchId = null, DateTime? fromDate = null, DateTime? toDate = null);
+        Task<List<StockByProductTypeDto>> GetStockByProductTypeAsync(Guid? branchId = null, DateTime? fromDate = null, DateTime? toDate = null);
     }
 }

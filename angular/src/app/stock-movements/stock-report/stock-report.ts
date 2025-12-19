@@ -26,7 +26,7 @@ type SortDir = 'asc' | 'desc';
   styleUrls: ['./stock-report.scss'],
 })
 export class StockReport implements OnInit {
-  filtersCollapsed = false;
+  filtersCollapsed = true;
 
   form = this.fb.group({
     branchId: [''],

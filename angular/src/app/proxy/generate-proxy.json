@@ -2487,6 +2487,22 @@
                       "typeSimple": "string?",
                       "isOptional": true,
                       "defaultValue": null
+                    },
+                    {
+                      "name": "fromDate",
+                      "typeAsString": "System.Nullable`1[[System.DateTime, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
+                      "type": "System.DateTime?",
+                      "typeSimple": "string?",
+                      "isOptional": true,
+                      "defaultValue": null
+                    },
+                    {
+                      "name": "toDate",
+                      "typeAsString": "System.Nullable`1[[System.DateTime, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
+                      "type": "System.DateTime?",
+                      "typeSimple": "string?",
+                      "isOptional": true,
+                      "defaultValue": null
                     }
                   ],
                   "returnValue": {
@@ -2504,6 +2520,22 @@
                       "typeSimple": "string?",
                       "isOptional": true,
                       "defaultValue": null
+                    },
+                    {
+                      "name": "fromDate",
+                      "typeAsString": "System.Nullable`1[[System.DateTime, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
+                      "type": "System.DateTime?",
+                      "typeSimple": "string?",
+                      "isOptional": true,
+                      "defaultValue": null
+                    },
+                    {
+                      "name": "toDate",
+                      "typeAsString": "System.Nullable`1[[System.DateTime, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
+                      "type": "System.DateTime?",
+                      "typeSimple": "string?",
+                      "isOptional": true,
+                      "defaultValue": null
                     }
                   ],
                   "returnValue": {
@@ -2518,6 +2550,22 @@
                       "name": "branchId",
                       "typeAsString": "System.Nullable`1[[System.Guid, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
                       "type": "System.Guid?",
+                      "typeSimple": "string?",
+                      "isOptional": true,
+                      "defaultValue": null
+                    },
+                    {
+                      "name": "fromDate",
+                      "typeAsString": "System.Nullable`1[[System.DateTime, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
+                      "type": "System.DateTime?",
+                      "typeSimple": "string?",
+                      "isOptional": true,
+                      "defaultValue": null
+                    },
+                    {
+                      "name": "toDate",
+                      "typeAsString": "System.Nullable`1[[System.DateTime, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
+                      "type": "System.DateTime?",
                       "typeSimple": "string?",
                       "isOptional": true,
                       "defaultValue": null
@@ -3425,8 +3473,8 @@
               "allowAnonymous": false,
               "implementFrom": "POS.StockMovements.IStockMovementAppService"
             },
-            "GetDashboardSummaryAsyncByBranchId": {
-              "uniqueName": "GetDashboardSummaryAsyncByBranchId",
+            "GetDashboardSummaryAsyncByBranchIdAndFromDateAndToDate": {
+              "uniqueName": "GetDashboardSummaryAsyncByBranchIdAndFromDateAndToDate",
               "name": "GetDashboardSummaryAsync",
               "httpMethod": "GET",
               "url": "api/app/stock-movement/dashboard-summary",
@@ -3439,6 +3487,22 @@
                   "typeSimple": "string?",
                   "isOptional": true,
                   "defaultValue": null
+                },
+                {
+                  "name": "fromDate",
+                  "typeAsString": "System.Nullable`1[[System.DateTime, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
+                  "type": "System.DateTime?",
+                  "typeSimple": "string?",
+                  "isOptional": true,
+                  "defaultValue": null
+                },
+                {
+                  "name": "toDate",
+                  "typeAsString": "System.Nullable`1[[System.DateTime, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
+                  "type": "System.DateTime?",
+                  "typeSimple": "string?",
+                  "isOptional": true,
+                  "defaultValue": null
                 }
               ],
               "parameters": [
@@ -3447,6 +3511,30 @@
                   "name": "branchId",
                   "jsonName": null,
                   "type": "System.Guid?",
+                  "typeSimple": "string?",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                },
+                {
+                  "nameOnMethod": "fromDate",
+                  "name": "fromDate",
+                  "jsonName": null,
+                  "type": "System.DateTime?",
+                  "typeSimple": "string?",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                },
+                {
+                  "nameOnMethod": "toDate",
+                  "name": "toDate",
+                  "jsonName": null,
+                  "type": "System.DateTime?",
                   "typeSimple": "string?",
                   "isOptional": false,
                   "defaultValue": null,
@@ -3462,8 +3550,8 @@
               "allowAnonymous": false,
               "implementFrom": "POS.StockMovements.IStockMovementAppService"
             },
-            "GetLast7DaysSalesAsyncByBranchId": {
-              "uniqueName": "GetLast7DaysSalesAsyncByBranchId",
+            "GetLast7DaysSalesAsyncByBranchIdAndFromDateAndToDate": {
+              "uniqueName": "GetLast7DaysSalesAsyncByBranchIdAndFromDateAndToDate",
               "name": "GetLast7DaysSalesAsync",
               "httpMethod": "GET",
               "url": "api/app/stock-movement/last7Days-sales",
@@ -3473,6 +3561,22 @@
                   "name": "branchId",
                   "typeAsString": "System.Nullable`1[[System.Guid, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
                   "type": "System.Guid?",
+                  "typeSimple": "string?",
+                  "isOptional": true,
+                  "defaultValue": null
+                },
+                {
+                  "name": "fromDate",
+                  "typeAsString": "System.Nullable`1[[System.DateTime, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
+                  "type": "System.DateTime?",
+                  "typeSimple": "string?",
+                  "isOptional": true,
+                  "defaultValue": null
+                },
+                {
+                  "name": "toDate",
+                  "typeAsString": "System.Nullable`1[[System.DateTime, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
+                  "type": "System.DateTime?",
                   "typeSimple": "string?",
                   "isOptional": true,
                   "defaultValue": null
@@ -3490,6 +3594,30 @@
                   "constraintTypes": null,
                   "bindingSourceId": "ModelBinding",
                   "descriptorName": ""
+                },
+                {
+                  "nameOnMethod": "fromDate",
+                  "name": "fromDate",
+                  "jsonName": null,
+                  "type": "System.DateTime?",
+                  "typeSimple": "string?",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                },
+                {
+                  "nameOnMethod": "toDate",
+                  "name": "toDate",
+                  "jsonName": null,
+                  "type": "System.DateTime?",
+                  "typeSimple": "string?",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
                 }
               ],
               "returnValue": {
@@ -3499,8 +3627,8 @@
               "allowAnonymous": false,
               "implementFrom": "POS.StockMovements.IStockMovementAppService"
             },
-            "GetStockByProductTypeAsyncByBranchId": {
-              "uniqueName": "GetStockByProductTypeAsyncByBranchId",
+            "GetStockByProductTypeAsyncByBranchIdAndFromDateAndToDate": {
+              "uniqueName": "GetStockByProductTypeAsyncByBranchIdAndFromDateAndToDate",
               "name": "GetStockByProductTypeAsync",
               "httpMethod": "GET",
               "url": "api/app/stock-movement/stock-by-product-type",
@@ -3513,6 +3641,22 @@
                   "typeSimple": "string?",
                   "isOptional": true,
                   "defaultValue": null
+                },
+                {
+                  "name": "fromDate",
+                  "typeAsString": "System.Nullable`1[[System.DateTime, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
+                  "type": "System.DateTime?",
+                  "typeSimple": "string?",
+                  "isOptional": true,
+                  "defaultValue": null
+                },
+                {
+                  "name": "toDate",
+                  "typeAsString": "System.Nullable`1[[System.DateTime, System.Private.CoreLib, Version=9.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Private.CoreLib",
+                  "type": "System.DateTime?",
+                  "typeSimple": "string?",
+                  "isOptional": true,
+                  "defaultValue": null
                 }
               ],
               "parameters": [
@@ -3521,6 +3665,30 @@
                   "name": "branchId",
                   "jsonName": null,
                   "type": "System.Guid?",
+                  "typeSimple": "string?",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                },
+                {
+                  "nameOnMethod": "fromDate",
+                  "name": "fromDate",
+                  "jsonName": null,
+                  "type": "System.DateTime?",
+                  "typeSimple": "string?",
+                  "isOptional": false,
+                  "defaultValue": null,
+                  "constraintTypes": null,
+                  "bindingSourceId": "ModelBinding",
+                  "descriptorName": ""
+                },
+                {
+                  "nameOnMethod": "toDate",
+                  "name": "toDate",
+                  "jsonName": null,
+                  "type": "System.DateTime?",
                   "typeSimple": "string?",
                   "isOptional": false,
                   "defaultValue": null,
@@ -7821,7 +7989,43 @@
       "genericArguments": null,
       "properties": [
         {
-          "name": "TodaySales",
+          "name": "FromDate",
+          "jsonName": null,
+          "type": "System.DateTime",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "ToDate",
+          "jsonName": null,
+          "type": "System.DateTime",
+          "typeSimple": "string",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "PeriodSalesInclVat",
+          "jsonName": null,
+          "type": "System.Decimal",
+          "typeSimple": "number",
+          "isRequired": false,
+          "minLength": null,
+          "maxLength": null,
+          "minimum": null,
+          "maximum": null,
+          "regex": null
+        },
+        {
+          "name": "PeriodProfitInclVat",
           "jsonName": null,
           "type": "System.Decimal",
           "typeSimple": "number",
