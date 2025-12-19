@@ -13,7 +13,6 @@ import { FormsModule } from '@angular/forms';
 import { BaseChartDirective } from 'ng2-charts';
 import { AuthService, ConfigStateService, CurrentUserDto } from '@abp/ng.core';
 
-// 👉 Your existing proxies
 import {
   StockMovementService,
   StockDashboardSummaryDto,
@@ -37,7 +36,12 @@ interface SummaryCard {
   value: number;
   format: string;
   subtitle?: string;
+
+  // ✅ currency flag for KPI formatting
+  isCurrency?: boolean;
 }
+
+type SalesGranularity = 'day' | 'week' | 'month';
 
 @Component({
   selector: 'app-home',
@@ -55,16 +59,19 @@ export class HomeComponent implements OnInit {
   currentUser$!: Observable<CurrentUserDto>;
   isAdmin = false;
 
-  // 🔹 Branches (aligned with Cart logic)
+  // Branch
   branches: BranchOption[] = [];
   selectedBranchId: string | '' = '';
   currentBranchName = '';
+
+  // Date range (ISO: yyyy-MM-dd)
+  fromDateStr = '';
+  toDateStr = '';
 
   summaryCards: SummaryCard[] = [];
 
   // ===== Charts =====
 
-  // Bar: sales last 7 days
   salesChartData: ChartConfiguration<'bar'>['data'] = {
     labels: [],
     datasets: [
@@ -74,49 +81,13 @@ export class HomeComponent implements OnInit {
         backgroundColor: '#2563eb',
         hoverBackgroundColor: '#1d4ed8',
         borderRadius: 8,
-        maxBarThickness: 40,
+        maxBarThickness: 26,
       },
     ],
   };
 
-  salesChartOptions: ChartOptions<'bar'> = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        mode: 'index',
-        intersect: false,
-        callbacks: {
-          label: ctx => {
-            const v = ctx.parsed.y ?? 0;
-            return `Rs ${v.toLocaleString('en-PK', {
-              maximumFractionDigits: 0,
-            })}`;
-          },
-        },
-      },
-    },
-    scales: {
-      x: {
-        grid: { display: false },
-        ticks: {
-          font: { size: 11 },
-          color: '#6b7280',
-        },
-      },
-      y: {
-        grid: { color: 'rgba(148,163,184,0.25)' },
-        ticks: {
-          font: { size: 11 },
-          color: '#6b7280',
-          precision: 0,
-        },
-      },
-    },
-  };
+  salesChartOptions: ChartOptions<'bar'> = this.buildSalesChartOptions();
 
-  // Doughnut: stock by product type
   stockChartData: ChartConfiguration<'doughnut'>['data'] = {
     labels: [],
     datasets: [
@@ -129,34 +100,7 @@ export class HomeComponent implements OnInit {
     ],
   };
 
-  stockChartOptions: ChartOptions<'doughnut'> = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'bottom',
-        labels: {
-          font: { size: 11 },
-          usePointStyle: true,
-        },
-      },
-      tooltip: {
-        callbacks: {
-          label: ctx => {
-            const label = ctx.label || '';
-            const value = ctx.parsed ?? 0;
-            const total =
-              (ctx.chart.data.datasets?.[0]?.data as number[]).reduce(
-                (s, n) => s + (n || 0),
-                0,
-              ) || 1;
-            const pct = ((value / total) * 100).toFixed(1);
-            return `${label}: ${value} (${pct}%)`;
-          },
-        },
-      },
-    },
-  };
+  stockChartOptions: ChartOptions<'doughnut'> = this.buildStockChartOptions();
 
   // =====================
 
@@ -166,6 +110,14 @@ export class HomeComponent implements OnInit {
 
   ngOnInit(): void {
     this.applyThemeColorsToCharts();
+
+    // Default date range: last 7 days (including today)
+    const today = new Date();
+    const from = new Date(today);
+    from.setDate(from.getDate() - 6);
+
+    this.fromDateStr = this.formatDateInput(from);
+    this.toDateStr = this.formatDateInput(today);
 
     this.currentUser$ = this.configState.getOne$('currentUser');
 
@@ -177,12 +129,10 @@ export class HomeComponent implements OnInit {
       const userBranchName = extra.BranchName ?? '';
 
       if (!this.isAdmin) {
-        // Non-admin: fixed to their branch
         this.selectedBranchId = userBranchId;
         this.currentBranchName = userBranchName;
         this.loadDashboardData();
       } else {
-        // Admin: load branches via BranchAppService (Cart-like behaviour)
         this.loadBranches();
       }
     });
@@ -196,7 +146,17 @@ export class HomeComponent implements OnInit {
     this.loadDashboardData();
   }
 
-  // 🔹 Branch loading logic copied from Cart (adapted)
+  onBranchChanged(): void {
+    const b = this.branches.find(x => x.id === this.selectedBranchId);
+    this.currentBranchName = b?.name || '';
+    this.loadDashboardData();
+  }
+
+  onDateRangeChanged(): void {
+    this.normalizeDateInputs();
+    this.loadDashboardData();
+  }
+
   private loadBranches(): void {
     if (!this.isAdmin) return;
 
@@ -212,7 +172,6 @@ export class HomeComponent implements OnInit {
           vatPerc: (b as any).vatPerc ?? null,
         }));
 
-        // default selection for admin
         if (!this.selectedBranchId && this.branches.length) {
           this.selectedBranchId = this.branches[0].id;
         }
@@ -220,20 +179,11 @@ export class HomeComponent implements OnInit {
         this.currentBranchName =
           this.branches.find(x => x.id === this.selectedBranchId)?.name || '';
 
-        // Once branches are loaded, load dashboard
         this.loadDashboardData();
       });
   }
 
-  onBranchChanged(): void {
-    // Update display name and reload dashboard when admin switches branch
-    const b = this.branches.find(x => x.id === this.selectedBranchId);
-    this.currentBranchName = b?.name || '';
-    this.loadDashboardData();
-  }
-
   private loadDashboardData(): void {
-    // For non-admins: backend reads branch from claim
     const effectiveBranchId =
       this.isAdmin && this.selectedBranchId
         ? (this.selectedBranchId as string)
@@ -242,65 +192,317 @@ export class HomeComponent implements OnInit {
     const branchSuffix =
       this.isAdmin && !this.selectedBranchId ? ' · all branches' : '';
 
+    const apiFrom = this.toApiDateTime(this.fromDateStr);
+    const apiTo = this.toApiDateTime(this.toDateStr);
+
     forkJoin({
-      summary: this.stockMovementService.getDashboardSummary(effectiveBranchId),
-      sales: this.stockMovementService.getLast7DaysSales(effectiveBranchId),
-      stock: this.stockMovementService.getStockByProductType(effectiveBranchId),
+      summary: this.stockMovementService.getDashboardSummary(
+        effectiveBranchId,
+        apiFrom,
+        apiTo
+      ),
+      sales: this.stockMovementService.getLast7DaysSales(
+        effectiveBranchId,
+        apiFrom,
+        apiTo
+      ),
+      stock: this.stockMovementService.getStockByProductType(
+        effectiveBranchId,
+        apiFrom,
+        apiTo
+      ),
     }).subscribe(({ summary, sales, stock }) => {
-      // ---- Summary cards ----
+      const s = summary as StockDashboardSummaryDto;
+
+      const rangeText =
+        `${this.displayDate(this.fromDateStr)} → ${this.displayDate(this.toDateStr)}` +
+        `${branchSuffix}`;
+
+      // Summary cards
       this.summaryCards = [
         {
-          label: "Today's Sales",
+          label: 'Sales (Period)',
           icon: 'fa fa-cash-register',
-          value: summary?.todaySales ?? 0,
+          value: (s as any)?.periodSalesInclVat ?? 0,
           format: '1.0-0',
-          subtitle: `Net sales${branchSuffix}`,
+          subtitle: rangeText,
+          isCurrency: true,
+        },
+        {
+          label: 'Profit (Period)',
+          icon: 'fa fa-chart-line',
+          value: (s as any)?.periodProfitInclVat ?? (s as any)?.periodProfitExclVat ?? 0,
+          format: '1.0-0',
+          subtitle: rangeText,
+          isCurrency: true,
         },
         {
           label: 'Stock Value',
           icon: 'fa fa-boxes',
-          value: summary?.stockValue ?? 0,
+          value: s?.stockValue ?? 0,
           format: '1.0-0',
-          subtitle: `At cost${branchSuffix}`,
+          subtitle: `As of ${this.displayDate(this.toDateStr)}${branchSuffix}`,
+          isCurrency: true,
         },
         {
           label: 'Active Products',
           icon: 'fa fa-box',
-          value: summary?.activeProducts ?? 0,
+          value: s?.activeProducts ?? 0,
           format: '1.0-0',
+          subtitle: `As of ${this.displayDate(this.toDateStr)}${branchSuffix}`,
         },
         {
           label: 'Low Stock Items',
           icon: 'fa fa-exclamation-triangle',
-          value: summary?.lowStockItems ?? 0,
+          value: s?.lowStockItems ?? 0,
           format: '1.0-0',
           subtitle: 'Below reorder level',
         },
       ];
 
-      // ---- Sales chart (last 7 days) ----
-      const salesLabels = (sales ?? []).map(p =>
-        new Date(p.date as any).toLocaleDateString('en-PK', {
-          weekday: 'short',
-        }),
-      );
-      const salesValues = (sales ?? []).map(p => p.amount ?? 0);
+      // ==========================
+      // SALES CHART: aggregate series for long periods
+      // ==========================
+      const salesPoints = (sales ?? []) as DailySalesPointDto[];
+
+      const start = new Date(this.fromDateStr);
+      const end = new Date(this.toDateStr);
+      const days = this.diffDaysInclusive(start, end);
+
+      const granularity: SalesGranularity =
+        days <= 31 ? 'day' : days <= 180 ? 'week' : 'month';
+
+      const agg = this.aggregateSales(salesPoints, granularity);
 
       this.salesChartData = {
         ...this.salesChartData,
-        labels: salesLabels,
-        datasets: [{ ...this.salesChartData.datasets[0], data: salesValues }],
+        labels: agg.labels,
+        datasets: [{ ...this.salesChartData.datasets[0], data: agg.values }],
       };
 
-      // ---- Stock chart (by product type) ----
-      const stockLabels = (stock ?? []).map(x => x.productType || 'N/A');
-      const stockValues = (stock ?? []).map(x => x.onHand ?? 0);
+      this.salesChartOptions = this.buildSalesChartOptions();
+
+      // ==========================
+      // STOCK (doughnut with built-in right legend)
+      // ==========================
+      const stockPoints = (stock ?? []) as StockByProductTypeDto[];
+
+      const sorted = [...stockPoints].sort(
+        (a, b) => (b.onHand ?? 0) - (a.onHand ?? 0)
+      );
+
+      const stockLabels = sorted.map(x => x.productType || 'N/A');
+      const stockValues = sorted.map(x => x.onHand ?? 0);
 
       this.stockChartData = {
         ...this.stockChartData,
         labels: stockLabels,
         datasets: [{ ...this.stockChartData.datasets[0], data: stockValues }],
       };
+
+      this.stockChartOptions = this.buildStockChartOptions();
+    });
+  }
+
+  // -------- Sales aggregation (handles “period axis”) --------
+  private aggregateSales(
+    points: DailySalesPointDto[],
+    granularity: SalesGranularity
+  ): { labels: string[]; values: number[] } {
+    const rows = (points || [])
+      .map(p => ({ d: new Date(p.date as any), v: Number(p.amount ?? 0) }))
+      .filter(x => !isNaN(x.d.getTime()));
+
+    const buckets = new Map<string, { keyDate: Date; sum: number }>();
+
+    for (const r of rows) {
+      const keyDate = this.bucketDate(r.d, granularity);
+      const key = this.formatKey(keyDate, granularity);
+
+      const existing = buckets.get(key);
+      if (existing) existing.sum += r.v;
+      else buckets.set(key, { keyDate, sum: r.v });
+    }
+
+    const sorted = Array.from(buckets.values()).sort(
+      (a, b) => a.keyDate.getTime() - b.keyDate.getTime()
+    );
+
+    return {
+      labels: sorted.map(x => this.formatLabel(x.keyDate, granularity)),
+      values: sorted.map(x => Number((x.sum ?? 0).toFixed(0))),
+    };
+  }
+
+  private bucketDate(d: Date, granularity: SalesGranularity): Date {
+    const x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+
+    if (granularity === 'day') return x;
+
+    if (granularity === 'week') {
+      // week start: Monday
+      const day = (x.getDay() + 6) % 7; // Mon=0 ... Sun=6
+      x.setDate(x.getDate() - day);
+      return x;
+    }
+
+    // month
+    x.setDate(1);
+    return x;
+  }
+
+  private formatKey(d: Date, granularity: SalesGranularity): string {
+    if (granularity === 'month') {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    }
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+      2,
+      '0'
+    )}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  private formatLabel(d: Date, granularity: SalesGranularity): string {
+    if (granularity === 'day') {
+      return d.toLocaleDateString('en-PK', { day: '2-digit', month: 'short' });
+    }
+    if (granularity === 'week') {
+      return d.toLocaleDateString('en-PK', { day: '2-digit', month: 'short' });
+    }
+    return d.toLocaleDateString('en-PK', { month: 'short', year: 'numeric' });
+  }
+
+  private diffDaysInclusive(a: Date, b: Date): number {
+    const start = new Date(a);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(b);
+    end.setHours(0, 0, 0, 0);
+
+    const ms = end.getTime() - start.getTime();
+    return Math.max(1, Math.floor(ms / 86400000) + 1);
+  }
+
+  // -------- Chart options --------
+  private buildSalesChartOptions(): ChartOptions<'bar'> {
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          callbacks: {
+            label: ctx => {
+              const v = ctx.parsed.y ?? 0;
+              return `PKR ${v.toLocaleString('en-PK', {
+                maximumFractionDigits: 0,
+              })}`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: {
+            autoSkip: true,
+            maxTicksLimit: 10,
+            maxRotation: 0,
+            minRotation: 0,
+            font: { size: 11 },
+            color: '#6b7280',
+          },
+        },
+        y: {
+          beginAtZero: true,
+          grid: { color: 'rgba(148,163,184,0.25)' },
+          ticks: {
+            font: { size: 11 },
+            color: '#6b7280',
+            precision: 0,
+          },
+        },
+      },
+    };
+  }
+
+  private buildStockChartOptions(): ChartOptions<'doughnut'> {
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '62%',
+      layout: { padding: { right: 8 } },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'right',
+          align: 'center',
+          labels: {
+            usePointStyle: true,
+            pointStyle: 'circle',
+            boxWidth: 10,
+            boxHeight: 10,
+            padding: 14,
+            font: { size: 12 },
+            color: '#6b7280',
+          },
+        },
+        tooltip: {
+          callbacks: {
+            label: (ctx: any) => {
+              const label = ctx.label || '';
+              const value = ctx.parsed ?? 0;
+              const total =
+                ((ctx.chart.data.datasets?.[0]?.data as number[]) || []).reduce(
+                  (s, n) => s + (n || 0),
+                  0
+                ) || 1;
+              const pct = ((value / total) * 100).toFixed(1);
+              return `${label}: ${value} (${pct}%)`;
+            },
+          },
+        },
+      },
+    };
+  }
+
+  // -------- Helpers --------
+  private normalizeDateInputs(): void {
+    if (!this.fromDateStr && this.toDateStr) this.fromDateStr = this.toDateStr;
+    if (!this.toDateStr && this.fromDateStr) this.toDateStr = this.fromDateStr;
+
+    if (this.fromDateStr && this.toDateStr) {
+      const f = new Date(this.fromDateStr);
+      const t = new Date(this.toDateStr);
+      if (f.getTime() > t.getTime()) {
+        const tmp = this.fromDateStr;
+        this.fromDateStr = this.toDateStr;
+        this.toDateStr = tmp;
+      }
+    }
+  }
+
+  private toApiDateTime(dateStr: string): string | undefined {
+    if (!dateStr) return undefined;
+    return `${dateStr}T00:00:00`;
+  }
+
+  private formatDateInput(d: Date): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  private displayDate(dateStr: string): string {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('en-PK', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
     });
   }
 

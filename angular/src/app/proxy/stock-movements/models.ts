@@ -94,7 +94,10 @@ export interface StockByProductTypeDto {
 }
 
 export interface StockDashboardSummaryDto {
-  todaySales: number;
+  fromDate?: string;
+  toDate?: string;
+  periodSalesInclVat: number;
+  periodProfitInclVat: number;
   stockValue: number;
   activeProducts: number;
   lowStockItems: number;

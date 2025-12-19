@@ -53,7 +53,7 @@ export class StockMovementComponent implements OnInit {
   rows = signal<ProductMovementDto[]>([]);
   totalCount = signal(0);
 
-  filtersCollapsed = false;
+  filtersCollapsed = true;
 
   pageSize = signal<number>(10);
   pageIndex = signal<number>(1);

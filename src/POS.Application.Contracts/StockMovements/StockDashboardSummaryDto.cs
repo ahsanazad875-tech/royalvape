@@ -4,7 +4,10 @@ namespace POS.StockMovements;
 
 public class StockDashboardSummaryDto
 {
-    public decimal TodaySales { get; set; }
+    public DateTime FromDate { get; set; }
+    public DateTime ToDate { get; set; }
+    public decimal PeriodSalesInclVat { get; set; }
+    public decimal PeriodProfitInclVat { get; set; }
     public decimal StockValue { get; set; }
     public int ActiveProducts { get; set; }
     public int LowStockItems { get; set; }

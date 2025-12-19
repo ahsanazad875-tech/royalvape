@@ -71,20 +71,20 @@ export class StockMovementService {
     { apiName: this.apiName,...config });
   
 
-  getDashboardSummary = (branchId?: string, config?: Partial<Rest.Config>) =>
+  getDashboardSummary = (branchId?: string, fromDate?: string, toDate?: string, config?: Partial<Rest.Config>) =>
     this.restService.request<any, StockDashboardSummaryDto>({
       method: 'GET',
       url: '/api/app/stock-movement/dashboard-summary',
-      params: { branchId },
+      params: { branchId, fromDate, toDate },
     },
     { apiName: this.apiName,...config });
   
 
-  getLast7DaysSales = (branchId?: string, config?: Partial<Rest.Config>) =>
+  getLast7DaysSales = (branchId?: string, fromDate?: string, toDate?: string, config?: Partial<Rest.Config>) =>
     this.restService.request<any, DailySalesPointDto[]>({
       method: 'GET',
       url: '/api/app/stock-movement/last7Days-sales',
-      params: { branchId },
+      params: { branchId, fromDate, toDate },
     },
     { apiName: this.apiName,...config });
   
@@ -134,11 +134,11 @@ export class StockMovementService {
     { apiName: this.apiName,...config });
   
 
-  getStockByProductType = (branchId?: string, config?: Partial<Rest.Config>) =>
+  getStockByProductType = (branchId?: string, fromDate?: string, toDate?: string, config?: Partial<Rest.Config>) =>
     this.restService.request<any, StockByProductTypeDto[]>({
       method: 'GET',
       url: '/api/app/stock-movement/stock-by-product-type',
-      params: { branchId },
+      params: { branchId, fromDate, toDate },
     },
     { apiName: this.apiName,...config });
   

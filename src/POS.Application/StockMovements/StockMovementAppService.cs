@@ -621,13 +621,32 @@ namespace POS.StockMovements
 
         #region Dashboard
 
-        private const decimal LowStockThreshold = 5m; // you can tweak this
+        private const decimal LowStockThreshold = 1m; // you can tweak this
+
+        private (DateTime Start, DateTime EndExclusive) NormalizeDateRange(DateTime? fromDate, DateTime? toDate)
+        {
+            // Inclusive date range: [Start 00:00, (ToDate + 1) 00:00)
+            var start = (fromDate ?? Clock.Now).Date;
+            var endDate = (toDate ?? start).Date;
+            var endExclusive = endDate.AddDays(1);
+
+            if (endExclusive <= start)
+                endExclusive = start.AddDays(1);
+
+            return (start, endExclusive);
+        }
 
         [Authorize(POSPermissions.StockMovements.Default)]
-        public virtual async Task<StockDashboardSummaryDto> GetDashboardSummaryAsync(Guid? branchId = null)
+        public virtual async Task<StockDashboardSummaryDto> GetDashboardSummaryAsync(
+            Guid? branchId = null,
+            DateTime? fromDate = null,
+            DateTime? toDate = null)
         {
             var isAdmin = await IsAdminAsync();
             var effectiveBranchId = isAdmin ? branchId : await RequireUserBranchAsync();
+
+            var today = Clock.Now.Date;
+            var (start, endExclusive) = NormalizeDateRange(fromDate ?? today, toDate ?? today);
 
             var qHeaders = (await Repository.GetQueryableAsync())
                 .Where(h => !h.IsCancelled);
@@ -635,43 +654,90 @@ namespace POS.StockMovements
             if (effectiveBranchId.HasValue && effectiveBranchId.Value != Guid.Empty)
                 qHeaders = qHeaders.Where(h => h.BranchId == effectiveBranchId.Value);
 
-            // ----- Today's sales (header.AmountInclVat, only Sales) -----
-            var today = Clock.Now.Date;
-            var tomorrow = today.AddDays(1);
-
-            var todaySalesQuery = qHeaders
-                .Where(h => h.StockMovementType == StockMovementType.Sale &&
-                            h.CreationTime >= today &&
-                            h.CreationTime < tomorrow)
-                .Select(h => h.AmountInclVat ?? 0m);
-
-            var todaySalesList = await AsyncExecuter.ToListAsync(todaySalesQuery);
-            var todaySales = todaySalesList.Sum();
-
-            // ----- Stock value, active products, low stock -----
-            // Calculate on-hand and simple weighted-average cost per product.
-            var stockAggQuery =
+            // ------------------------------------------------------------
+            // Period Sales + Profit (based on sold products' BuyingUnitPrice)
+            // Selling: SUM(Sale detail AmountInclVat)
+            // Buying : SUM(SoldQty * Product.BuyingUnitPrice)
+            //
+            // IMPORTANT: Replace Product.BuyingUnitPrice with your actual field name.
+            // ------------------------------------------------------------
+            var salesByProductQuery =
                 from h in qHeaders
+                where h.StockMovementType == StockMovementType.Sale
+                      && h.CreationTime >= start
+                      && h.CreationTime < endExclusive
+                from d in h.StockMovementDetails
+                group d by d.ProductId
+                into g
+                select new
+                {
+                    ProductId = g.Key,
+                    SoldQty = g.Sum(x => x.Quantity),
+
+                    // selling amounts come directly from stored amounts
+                    SalesInclVat = g.Sum(x => x.AmountInclVat ?? 0m),
+                    SalesExclVat = g.Sum(x => x.AmountExclVat ?? 0m),
+
+                    // buying unit price from product
+                    BuyingUnitPrice = g.Max(x => x.Product.BuyingUnitPrice) // <-- rename if needed
+                };
+
+            var salesByProduct = await AsyncExecuter.ToListAsync(salesByProductQuery);
+
+            decimal periodSalesInclVat = 0m;
+            decimal periodSalesExclVat = 0m;
+            decimal totalBuyingAmount = 0m;
+
+            foreach (var x in salesByProduct)
+            {
+                periodSalesInclVat += x.SalesInclVat;
+                periodSalesExclVat += x.SalesExclVat;
+
+                totalBuyingAmount += x.SoldQty * x.BuyingUnitPrice;
+            }
+
+            // Profit based on incl-vat selling amounts (as you requested)
+            var periodProfitInclVat = periodSalesInclVat - totalBuyingAmount;
+
+            // Profit excl-vat (if you have AmountExclVat on details; otherwise it will be 0 and we fallback)
+            var periodProfitExclVat = periodSalesExclVat > 0m
+                ? (periodSalesExclVat - totalBuyingAmount)
+                : periodProfitInclVat;
+
+            // Backward-compat (if your UI still reads TodaySales)
+            var todaySales = periodSalesInclVat;
+
+            // ------------------------------------------------------------
+            // Stock snapshot AS-OF toDate (cumulative up to endExclusive)
+            // (kept as your weighted-average amount allocation; no UnitPrice * Qty)
+            // ------------------------------------------------------------
+            var qHeadersAsOf = qHeaders.Where(h => h.CreationTime < endExclusive);
+
+            var stockAggQuery =
+                from h in qHeadersAsOf
                 from d in h.StockMovementDetails
                 group new { h, d } by d.ProductId
                 into g
                 select new
                 {
                     ProductId = g.Key,
+
                     OnHand = g.Sum(x =>
                         (x.h.StockMovementType == StockMovementType.Purchase ||
                          x.h.StockMovementType == StockMovementType.AdjustmentPlus)
                             ? x.d.Quantity
                             : -x.d.Quantity),
+
                     TotalInQty = g.Sum(x =>
                         (x.h.StockMovementType == StockMovementType.Purchase ||
                          x.h.StockMovementType == StockMovementType.AdjustmentPlus)
                             ? x.d.Quantity
                             : 0m),
-                    TotalInCost = g.Sum(x =>
+
+                    TotalInCostAmount = g.Sum(x =>
                         (x.h.StockMovementType == StockMovementType.Purchase ||
                          x.h.StockMovementType == StockMovementType.AdjustmentPlus)
-                            ? x.d.Quantity * (x.d.UnitPrice ?? 0m)
+                            ? (x.d.AmountExclVat ?? x.d.AmountInclVat ?? 0m)
                             : 0m)
                 };
 
@@ -683,24 +749,28 @@ namespace POS.StockMovements
 
             foreach (var x in stockAggList)
             {
-                if (x.OnHand > 0)
+                if (x.OnHand > 0m)
                 {
                     activeProducts++;
 
                     if (x.OnHand <= LowStockThreshold)
                         lowStockItems++;
 
-                    if (x.TotalInQty > 0)
+                    if (x.TotalInQty > 0m)
                     {
-                        var avgCost = x.TotalInCost / x.TotalInQty;
-                        stockValue += x.OnHand * avgCost;
+                        stockValue += x.TotalInCostAmount * x.OnHand / x.TotalInQty;
                     }
                 }
             }
 
             return new StockDashboardSummaryDto
             {
-                TodaySales = decimal.Round(todaySales, 0),
+                FromDate = start,
+                ToDate = endExclusive.AddDays(-1),
+
+                PeriodSalesInclVat = decimal.Round(periodSalesInclVat, 0),
+                PeriodProfitInclVat = decimal.Round(periodProfitExclVat, 0),
+
                 StockValue = decimal.Round(stockValue, 0),
                 ActiveProducts = activeProducts,
                 LowStockItems = lowStockItems
@@ -708,25 +778,31 @@ namespace POS.StockMovements
         }
 
         [Authorize(POSPermissions.StockMovements.Default)]
-        public virtual async Task<List<DailySalesPointDto>> GetLast7DaysSalesAsync(Guid? branchId = null)
+        public virtual async Task<List<DailySalesPointDto>> GetLast7DaysSalesAsync(
+            Guid? branchId = null,
+            DateTime? fromDate = null,
+            DateTime? toDate = null)
         {
             var isAdmin = await IsAdminAsync();
             var effectiveBranchId = isAdmin ? branchId : await RequireUserBranchAsync();
 
+            // Default: last 7 days (including today)
+            var today = Clock.Now.Date;
+            var defaultFrom = today.AddDays(-6);
+            var defaultTo = today;
+
+            var (start, endExclusive) = NormalizeDateRange(fromDate ?? defaultFrom, toDate ?? defaultTo);
+
             var qHeaders = (await Repository.GetQueryableAsync())
-                .Where(h => !h.IsCancelled &&
-                            h.StockMovementType == StockMovementType.Sale);
+                .Where(h => !h.IsCancelled && h.StockMovementType == StockMovementType.Sale);
 
             if (effectiveBranchId.HasValue && effectiveBranchId.Value != Guid.Empty)
                 qHeaders = qHeaders.Where(h => h.BranchId == effectiveBranchId.Value);
 
-            var today = Clock.Now.Date;
-            var fromDate = today.AddDays(-6);
-
+            // Daily sales based on header AmountInclVat (simple + fast + matches your KPI)
             var groupedQuery =
                 qHeaders
-                    .Where(h => h.CreationTime >= fromDate &&
-                                h.CreationTime < today.AddDays(1))
+                    .Where(h => h.CreationTime >= start && h.CreationTime < endExclusive)
                     .GroupBy(h => h.CreationTime.Date)
                     .Select(g => new DailySalesPointDto
                     {
@@ -737,12 +813,15 @@ namespace POS.StockMovements
             var grouped = await AsyncExecuter.ToListAsync(groupedQuery);
             var map = grouped.ToDictionary(x => x.Date.Date, x => x.Amount);
 
-            // Ensure all 7 days exist
-            var result = new List<DailySalesPointDto>();
-            for (var i = 0; i < 7; i++)
+            // Ensure continuity (every date in range exists)
+            var days = (endExclusive.Date - start.Date).Days;
+            var result = new List<DailySalesPointDto>(days);
+
+            for (var i = 0; i < days; i++)
             {
-                var d = fromDate.AddDays(i);
+                var d = start.AddDays(i);
                 map.TryGetValue(d, out var amount);
+
                 result.Add(new DailySalesPointDto
                 {
                     Date = d,
@@ -754,13 +833,20 @@ namespace POS.StockMovements
         }
 
         [Authorize(POSPermissions.StockMovements.Default)]
-        public virtual async Task<List<StockByProductTypeDto>> GetStockByProductTypeAsync(Guid? branchId = null)
+        public virtual async Task<List<StockByProductTypeDto>> GetStockByProductTypeAsync(
+            Guid? branchId = null,
+            DateTime? fromDate = null,
+            DateTime? toDate = null)
         {
             var isAdmin = await IsAdminAsync();
             var effectiveBranchId = isAdmin ? branchId : await RequireUserBranchAsync();
 
+            // Snapshot "as-of toDate" (lower bound accepted but not applied for snapshot semantics)
+            var asOfDate = (toDate ?? Clock.Now.Date).Date;
+            var endExclusive = asOfDate.AddDays(1);
+
             var qHeaders = (await Repository.GetQueryableAsync())
-                .Where(h => !h.IsCancelled);
+                .Where(h => !h.IsCancelled && h.CreationTime < endExclusive);
 
             if (effectiveBranchId.HasValue && effectiveBranchId.Value != Guid.Empty)
                 qHeaders = qHeaders.Where(h => h.BranchId == effectiveBranchId.Value);
@@ -787,13 +873,11 @@ namespace POS.StockMovements
 
             var list = await AsyncExecuter.ToListAsync(query);
 
-            // Only keep positive on-hand, sorted by qty desc (front-end can still filter)
             return list
                 .Where(x => x.OnHand > 0)
                 .OrderByDescending(x => x.OnHand)
                 .ToList();
         }
-
         #endregion
 
     }

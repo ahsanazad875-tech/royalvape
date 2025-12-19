@@ -61,7 +61,7 @@ export class ListComponent implements OnInit {
   totalCount = 0;
   loading = false;
   isAdmin = false;
-  filtersCollapsed = false;
+  filtersCollapsed = true;
 
   pageIndex = 1;
   pageSize = 20;

@@ -8,6 +8,37 @@
     min-width: 190px;
   }
 
+  .dashboard-date-filter {
+    min-width: 150px;
+  }
+
+  .dashboard-main {
+    align-items: flex-start;
+  }
+
+  // LEFT column sticky on desktop
+  .dashboard-left {
+    @media (min-width: 992px) {
+      position: sticky;
+      top: 1rem;
+    }
+  }
+
+  // KPI cards layout
+  .dashboard-summary-grid {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: 1fr;
+
+    @media (min-width: 576px) and (max-width: 991.98px) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    @media (min-width: 992px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
   .dashboard-stat-card {
     border: 1px solid var(--neutral-150);
 
@@ -19,9 +50,37 @@
     }
 
     .stat-value {
+      display: flex;
+      align-items: baseline;
+      gap: 0.4rem;
       font-size: 1.4rem;
       font-weight: 600;
       color: var(--neutral-900);
+      line-height: 1.1;
+    }
+
+    .currency-prefix {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 0.25rem;
+      opacity: 0.9;
+
+      i {
+        font-size: 0.95rem;
+        transform: translateY(-1px);
+      }
+    }
+
+    .currency-text {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--neutral-500);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .value-text {
+      line-height: 1.1;
     }
 
     .stat-subtitle {
@@ -36,15 +95,31 @@
     }
   }
 
+  // Charts sizing
   .dashboard-chart {
-    height: 260px;
+    width: 100%;
 
     canvas {
-      max-height: 220px;
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
     }
   }
 
-  .table-responsive {
-    border-radius: 0 0 0.75rem 0.75rem;
+  .dashboard-chart--sales {
+    height: 240px;
+
+    @media (max-width: 575.98px) {
+      height: 220px;
+    }
+  }
+
+  // Slightly taller for right-side legend
+  .dashboard-chart--stock {
+    height: 290px;
+
+    @media (max-width: 575.98px) {
+      height: 260px;
+    }
   }
 }

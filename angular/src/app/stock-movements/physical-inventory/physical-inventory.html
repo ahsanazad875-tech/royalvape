@@ -23,20 +23,20 @@
           <div class="row g-3 align-items-end">
             <div class="col-12 col-md-6 col-lg-3">
               <label class="form-label">Branch</label>
-              <nz-select class="w-100" [nzAllowClear]="false" formControlName="branchId" nzPlaceHolder="Select Branch">
+              <nz-select class="w-100" [nzAllowClear]="false" nzShowSearch formControlName="branchId" nzPlaceHolder="Select Branch">
                 <nz-option *ngFor="let b of branches" [nzValue]="b.id" [nzLabel]="b.displayName"></nz-option>
               </nz-select>
             </div>
             <div class="col-12 col-md-6 col-lg-3">
               <label class="form-label">Product Type</label>
-              <nz-select class="w-100" nzAllowClear nzPlaceHolder="All" formControlName="productTypeId">
+              <nz-select class="w-100" nzAllowClear nzShowSearch nzPlaceHolder="All" formControlName="productTypeId">
                 <nz-option nzValue="" nzLabel="All"></nz-option>
                 <nz-option *ngFor="let t of productTypes" [nzValue]="t.id" [nzLabel]="t.type"></nz-option>
               </nz-select>
             </div>
             <div class="col-12 col-md-6 col-lg-3">
               <label class="form-label">Product</label>
-              <nz-select class="w-100" nzAllowClear nzPlaceHolder="All" formControlName="productId">
+              <nz-select class="w-100" nzAllowClear nzShowSearch nzPlaceHolder="All" formControlName="productId">
                 <nz-option nzValue="" nzLabel="All"></nz-option>
                 <nz-option *ngFor="let p of products" [nzValue]="p.id"
                   [nzLabel]="p.productNo + ' ' +p.productName"></nz-option>
