@@ -36,7 +36,7 @@ interface SummaryCard {
   value: number;
   format: string;
   subtitle?: string;
-
+  key?: string;
   // ✅ currency flag for KPI formatting
   isCurrency?: boolean;
 }
@@ -235,6 +235,7 @@ export class HomeComponent implements OnInit {
           format: '1.0-0',
           subtitle: rangeText,
           isCurrency: true,
+          key: 'profit',
         },
         {
           label: 'Stock Value',
@@ -260,6 +261,9 @@ export class HomeComponent implements OnInit {
         },
       ];
 
+      if (!this.isAdmin) {
+        this.summaryCards = this.summaryCards.filter(x => x.key !== 'profit' && x.label !== 'Profit (Period)');
+      }
       // ==========================
       // SALES CHART: aggregate series for long periods
       // ==========================
