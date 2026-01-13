@@ -261,9 +261,9 @@ export class HomeComponent implements OnInit {
         },
       ];
 
-      if (!this.isAdmin) {
-        this.summaryCards = this.summaryCards.filter(x => x.key !== 'profit' && x.label !== 'Profit (Period)');
-      }
+      // if (!this.isAdmin) {
+      //   this.summaryCards = this.summaryCards.filter(x => x.key !== 'profit' && x.label !== 'Profit (Period)');
+      // }
       // ==========================
       // SALES CHART: aggregate series for long periods
       // ==========================
