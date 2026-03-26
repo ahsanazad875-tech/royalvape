@@ -33,7 +33,7 @@ import { ProductTypeDto, ProductTypeService } from 'src/app/proxy/product-types'
     NzTableModule,
     NzButtonModule,
     NzInputModule,
-    NzModalModule
+    NzModalModule,
   ],
   templateUrl: './physical-inventory.html',
   styleUrls: ['./physical-inventory.scss'],
@@ -58,8 +58,9 @@ export class PhysicalInventoryComponent implements OnInit {
   loading = false;
 
   input: LookupRequestDto = {
-    maxResultCount: 1000
+    maxResultCount: 1000,
   };
+
   pageIndex = 1;
   pageSize = 25;
   totalCount = 0;
@@ -93,7 +94,7 @@ export class PhysicalInventoryComponent implements OnInit {
   ) {
     this.nzConfigService.set('notification', {
       nzPlacement: 'bottomRight',
-      nzDuration: 3000 // optional auto-close
+      nzDuration: 3000,
     });
   }
 
@@ -101,40 +102,45 @@ export class PhysicalInventoryComponent implements OnInit {
     this.loadBranches();
     this.loadProductTypes();
     this.loadProducts();
-    // Branch change subscription
+
     this.form.get('branchId')?.valueChanges.subscribe(branchId => {
       this.selectedBranch = this.branches.find(b => b.id === branchId);
+      this.resetTableStateForFreshLoad();
       this.loadStock(true);
     });
   }
 
-  loadBranches() {
+  loadBranches(): void {
     this.branchSvc.getLookup(this.input).subscribe(res => {
       this.branches = res.items ?? [];
+
       if (this.branches.length) {
         this.selectedBranch = this.branches[0];
         this.form.patchValue({ branchId: this.selectedBranch.id });
+        this.resetTableStateForFreshLoad();
         this.loadStock(true);
       }
     });
   }
 
-  loadProductTypes() {
+  loadProductTypes(): void {
     this.productTypeSvc.getList(this.input).subscribe(res => {
       this.productTypes = res.items ?? [];
     });
   }
 
-  loadProducts() {
+  loadProducts(): void {
     this.productSvc.getList(this.input).subscribe(res => {
       this.products = res.items ?? [];
     });
   }
 
-  loadStock(resetPage = false) {
+  loadStock(resetPage = false): void {
     if (!this.selectedBranch) return;
 
-    if (resetPage) this.pageIndex = 1;
+    if (resetPage) {
+      this.pageIndex = 1;
+    }
 
     const input: ProductStockListRequestDto = {
       branchId: this.selectedBranch.id,
@@ -143,23 +149,39 @@ export class PhysicalInventoryComponent implements OnInit {
       skipCount: (this.pageIndex - 1) * this.pageSize,
       maxResultCount: this.pageSize,
       sorting: this.sortField ? `${this.sortField} ${this.sortDir}` : undefined,
-      onlyAvailable: true
+      onlyAvailable: true,
     };
 
     this.loading = true;
-    this.stockSvc.getStockReport(input)
+
+    this.stockSvc
+      .getStockReport(input)
       .pipe(finalize(() => (this.loading = false)))
       .subscribe(res => {
         this.stockList = res.items ?? [];
         this.totalCount = res.totalCount ?? 0;
 
-        // Initialize qtyMap (preserve entered qty)
-        const newQtyMap: Record<number, number> = {};
-        this.stockList.forEach(item => {
-          newQtyMap[item.productId] = this.qtyMap[item.productId] ?? item.onHand;
-        });
-        this.qtyMap = newQtyMap;
+        // Important fix:
+        // Always initialize entered quantities from the CURRENT rows returned by the API.
+        // Do not preserve old values across filter/sort/page reloads, otherwise
+        // variances can appear from stale rows.
+        this.resetQtyMapFromCurrentRows();
       });
+  }
+
+  private resetQtyMapFromCurrentRows(): void {
+    const newQtyMap: Record<number, number> = {};
+
+    for (const item of this.stockList) {
+      newQtyMap[item.productId] = item.onHand;
+    }
+
+    this.qtyMap = newQtyMap;
+  }
+
+  private resetTableStateForFreshLoad(): void {
+    this.pageIndex = 1;
+    this.lastQueryKey = '';
   }
 
   trackRow = (_: number, r: StockReportDto) => `${r.branchId ?? 'x'}:${r.productId ?? 'x'}`;
@@ -169,41 +191,55 @@ export class PhysicalInventoryComponent implements OnInit {
     return entered - item.onHand;
   }
 
-  updateVariance(item: StockReportDto) { }
+  updateVariance(item: StockReportDto): void {
+    const value = this.qtyMap[item.productId];
 
-  adjustSingle(item: StockReportDto) {
+    if (value === null || value === undefined || Number.isNaN(Number(value))) {
+      this.qtyMap[item.productId] = item.onHand;
+      return;
+    }
+
+    this.qtyMap[item.productId] = Number(value);
+  }
+
+  adjustSingle(item: StockReportDto): void {
     const variance = this.calculateVariance(item);
+
     if (variance === 0) {
       this.notification.warning('No Variance', 'There is no variance to adjust.');
       return;
     }
 
     this.modalTitle = `Adjust stock for ${item.productName}`;
-    this.modalData = [{
-      productName: item.productName,
-      onHand: item.onHand,
-      entered: this.qtyMap[item.productId],
-      variance,
-      productId: item.productId,
-      unitPrice: item.buyingUnitPrice
-    }];
+    this.modalData = [
+      {
+        productName: item.productName,
+        onHand: item.onHand,
+        entered: this.qtyMap[item.productId] ?? item.onHand,
+        variance,
+        productId: item.productId,
+        unitPrice: item.buyingUnitPrice,
+      },
+    ];
     this.modalAction = 'single';
     this.currentItem = item;
     this.showAdjustmentModal = true;
   }
 
-  adjustAll() {
+  adjustAll(): void {
     const adjustments = this.stockList
       .map(item => {
         const variance = this.calculateVariance(item);
+
         if (variance === 0) return null;
+
         return {
           productName: item.productName,
           onHand: item.onHand,
-          entered: this.qtyMap[item.productId],
+          entered: this.qtyMap[item.productId] ?? item.onHand,
           variance,
           productId: item.productId,
-          unitPrice: item.buyingUnitPrice
+          unitPrice: item.buyingUnitPrice,
         };
       })
       .filter(x => x !== null) as typeof this.modalData;
@@ -216,140 +252,140 @@ export class PhysicalInventoryComponent implements OnInit {
     this.modalTitle = 'Confirm Stock Adjustments';
     this.modalData = adjustments;
     this.modalAction = 'bulk';
+    this.currentItem = undefined;
     this.showAdjustmentModal = true;
   }
 
-  confirmAdjustment() {
-  if (!this.selectedBranch) return;
+  confirmAdjustment(): void {
+    if (!this.selectedBranch) return;
 
-  // Helper to create a header dto
-  const createHeader = (type: StockMovementType): CreateUpdateStockMovementHeaderDto => ({
-    branchId: this.selectedBranch!.id,
-    isCancelled: false,
-    stockMovementType: type,
-    details: [],
-  });
-
-  // SINGLE
-  if (this.modalAction === 'single' && this.currentItem) {
-    const item = this.currentItem;
-    const variance = this.calculateVariance(item);
-
-    if (variance === 0) {
-      this.notification.warning('No Variance', 'There is no variance to adjust.');
-      return;
-    }
-
-    const dto: CreateUpdateStockMovementHeaderDto = {
-      branchId: this.selectedBranch.id,
+    const createHeader = (type: StockMovementType): CreateUpdateStockMovementHeaderDto => ({
+      branchId: this.selectedBranch!.id,
       isCancelled: false,
-      stockMovementType:
-        variance > 0 ? StockMovementType.AdjustmentPlus : StockMovementType.AdjustmentMinus,
-      details: [
-        {
-          productId: item.productId,
-          quantity: Math.abs(variance),
-          unitPrice: item.buyingUnitPrice,
-          discountAmount: 0,
-        } as any,
-      ],
-    };
-
-    this.loading = true;
-
-    this.stockSvc
-      .adjustStock(dto)
-      .pipe(
-        finalize(() => {
-          this.loading = false;
-          this.showAdjustmentModal = false;
-        }),
-      )
-      .subscribe({
-        next: () => {
-          this.notification.success('Success', 'Stock adjusted successfully.');
-          this.loadStock(false);
-        },
-        error: (err: any) => {
-          const msg =
-            err?.error?.error?.message ||
-            err?.error?.message ||
-            err?.message ||
-            'Failed to adjust stock.';
-          this.notification.error('Error', msg);
-        },
-      });
-
-    return;
-  }
-
-  // BULK
-  if (this.modalAction === 'bulk') {
-    const positives = createHeader(StockMovementType.AdjustmentPlus);
-    const negatives = createHeader(StockMovementType.AdjustmentMinus);
-
-    this.modalData.forEach(x => {
-      if (!x.variance) return;
-
-      const detail = {
-        productId: x.productId,
-        quantity: Math.abs(x.variance),
-        unitPrice: x.unitPrice,
-        discountAmount: 0,
-      } as any;
-
-      if (x.variance > 0) positives.details!.push(detail);
-      else negatives.details!.push(detail);
+      stockMovementType: type,
+      details: [],
     });
 
-    const requests = [];
-    if (positives.details?.length) requests.push(this.stockSvc.adjustStock(positives));
-    if (negatives.details?.length) requests.push(this.stockSvc.adjustStock(negatives));
+    if (this.modalAction === 'single' && this.currentItem) {
+      const item = this.currentItem;
+      const variance = this.calculateVariance(item);
 
-    // If user somehow opens modal but nothing to adjust
-    if (!requests.length) {
-      this.notification.warning('No Variances', 'There are no variances to adjust.');
-      this.showAdjustmentModal = false;
+      if (variance === 0) {
+        this.notification.warning('No Variance', 'There is no variance to adjust.');
+        return;
+      }
+
+      const dto: CreateUpdateStockMovementHeaderDto = {
+        branchId: this.selectedBranch.id,
+        isCancelled: false,
+        stockMovementType:
+          variance > 0 ? StockMovementType.AdjustmentPlus : StockMovementType.AdjustmentMinus,
+        details: [
+          {
+            productId: item.productId,
+            quantity: Math.abs(variance),
+            unitPrice: item.buyingUnitPrice,
+            discountAmount: 0,
+          } as any,
+        ],
+      };
+
+      this.loading = true;
+
+      this.stockSvc
+        .adjustStock(dto)
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+            this.showAdjustmentModal = false;
+            this.currentItem = undefined;
+          })
+        )
+        .subscribe({
+          next: () => {
+            this.notification.success('Success', 'Stock adjusted successfully.');
+            this.loadStock(false);
+          },
+          error: (err: any) => {
+            const msg =
+              err?.error?.error?.message ||
+              err?.error?.message ||
+              err?.message ||
+              'Failed to adjust stock.';
+            this.notification.error('Error', msg);
+          },
+        });
+
       return;
     }
 
-    this.loading = true;
+    if (this.modalAction === 'bulk') {
+      const positives = createHeader(StockMovementType.AdjustmentPlus);
+      const negatives = createHeader(StockMovementType.AdjustmentMinus);
 
-    forkJoin(requests)
-      .pipe(
-        finalize(() => {
-          this.loading = false;
-          this.showAdjustmentModal = false;
-        }),
-      )
-      .subscribe({
-        next: () => {
-          // Exactly what you want:
-          // - If both + and - exist => 2 adjustments created
-          // - If only one type exists => 1 adjustment created
-          this.notification.success('Success', 'Stock adjustments processed.');
-          this.loadStock(false);
-        },
-        error: (err: any) => {
-          const msg =
-            err?.error?.error?.message ||
-            err?.error?.message ||
-            err?.message ||
-            'Failed to process stock adjustments.';
-          this.notification.error('Error', msg);
-        },
+      this.modalData.forEach(x => {
+        if (!x.variance) return;
+
+        const detail = {
+          productId: x.productId,
+          quantity: Math.abs(x.variance),
+          unitPrice: x.unitPrice,
+          discountAmount: 0,
+        } as any;
+
+        if (x.variance > 0) {
+          positives.details!.push(detail);
+        } else {
+          negatives.details!.push(detail);
+        }
       });
 
-    return;
+      const requests = [];
+      if (positives.details?.length) requests.push(this.stockSvc.adjustStock(positives));
+      if (negatives.details?.length) requests.push(this.stockSvc.adjustStock(negatives));
+
+      if (!requests.length) {
+        this.notification.warning('No Variances', 'There are no variances to adjust.');
+        this.showAdjustmentModal = false;
+        this.currentItem = undefined;
+        return;
+      }
+
+      this.loading = true;
+
+      forkJoin(requests)
+        .pipe(
+          finalize(() => {
+            this.loading = false;
+            this.showAdjustmentModal = false;
+            this.currentItem = undefined;
+          })
+        )
+        .subscribe({
+          next: () => {
+            this.notification.success('Success', 'Stock adjustments processed.');
+            this.loadStock(false);
+          },
+          error: (err: any) => {
+            const msg =
+              err?.error?.error?.message ||
+              err?.error?.message ||
+              err?.message ||
+              'Failed to process stock adjustments.';
+            this.notification.error('Error', msg);
+          },
+        });
+
+      return;
+    }
+
+    this.showAdjustmentModal = false;
+    this.currentItem = undefined;
   }
 
-  // fallback
-  this.showAdjustmentModal = false;
-}
-
-
-  cancelAdjustment() {
+  cancelAdjustment(): void {
     this.showAdjustmentModal = false;
+    this.currentItem = undefined;
   }
 
   sortOrder(field: string): 'ascend' | 'descend' | null {
@@ -357,22 +393,44 @@ export class PhysicalInventoryComponent implements OnInit {
     return this.sortDir === 'asc' ? 'ascend' : 'descend';
   }
 
-  onQueryParamsChange(params: NzTableQueryParams) {
+  onQueryParamsChange(params: NzTableQueryParams): void {
     const pageIndex = params.pageIndex ?? 1;
     const pageSize = params.pageSize ?? this.pageSize;
 
     const s = (params.sort || []).find(x => x.value === 'ascend' || x.value === 'descend');
     const sortField = s?.key;
-    const sortDir: 'asc' | 'desc' | undefined = s ? (s.value === 'ascend' ? 'asc' : 'desc') : undefined;
+    const sortDir: 'asc' | 'desc' | undefined = s
+      ? s.value === 'ascend'
+        ? 'asc'
+        : 'desc'
+      : undefined;
 
     const key = `${pageIndex}|${pageSize}|${sortField ?? ''}|${sortDir ?? ''}`;
     if (key === this.lastQueryKey) return;
 
+    this.lastQueryKey = key;
     this.pageIndex = pageIndex;
     this.pageSize = pageSize;
     this.sortField = sortField;
     this.sortDir = sortDir;
 
     this.loadStock(false);
+  }
+
+  applyFilters(): void {
+    this.resetTableStateForFreshLoad();
+    this.loadStock(true);
+  }
+
+  resetFilters(): void {
+    const currentBranchId = this.selectedBranch?.id ?? '';
+    this.form.patchValue({
+      branchId: currentBranchId,
+      productId: '',
+      productTypeId: '',
+    });
+
+    this.resetTableStateForFreshLoad();
+    this.loadStock(true);
   }
 }
